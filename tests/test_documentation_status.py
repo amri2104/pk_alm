@@ -27,7 +27,8 @@ def test_progress_doc_mentions_first_and_last_sprint_and_test_count():
     text = PROGRESS_DOC.read_text()
     assert "Sprint 1A" in text
     assert "Sprint 3A" in text
-    assert "508 passed" in text
+    assert "Sprint 3B" in text
+    assert "549 passed" in text
 
 
 def test_pipeline_doc_mentions_key_functions():

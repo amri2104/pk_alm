@@ -16,8 +16,9 @@ build_default_stage1_portfolio()
             → summarize_cashflows_by_year(...)
                 → build_deterministic_asset_trajectory(...)
                     → build_funding_ratio_trajectory(...)
-                        → find_liquidity_inflection_year(...)
-                            → optional CSV export
+                        → summarize_funding_ratio(...)
+                            → find_liquidity_inflection_year(...)
+                                → optional CSV export
 ```
 
 Each step is a thin coordinator over already-tested components. The pipeline
@@ -141,8 +142,9 @@ to re-call the function.
 
 ## Step 7 — Asset Snapshots
 
-`build_deterministic_asset_trajectory` calibrates initial assets from the
-opening liability proxy and target funding ratio:
+`build_deterministic_asset_trajectory` produces `asset_snapshots`. It
+calibrates initial assets from the opening liability proxy and target funding
+ratio:
 
 ```text
 initial assets = total_stage1_liability(0) * target funding ratio
@@ -162,8 +164,8 @@ mapping from the first annual cashflow row.
 
 ## Step 8 — Funding Ratio
 
-`build_funding_ratio_trajectory` combines asset snapshots with valuation
-snapshots:
+`build_funding_ratio_trajectory` produces `funding_ratio_trajectory` by
+combining asset snapshots with valuation snapshots:
 
 ```text
 funding_ratio = closing_asset_value / total_stage1_liability
@@ -172,6 +174,17 @@ funding_ratio_percent = funding_ratio * 100
 
 The denominator is the current deterministic Stage-1 liability proxy,
 `total_stage1_liability`. Technical reserves remain excluded.
+
+## Step 9 — Funding Summary
+
+`summarize_funding_ratio` produces a compact `funding_summary` table from the
+funding-ratio trajectory. It reports thesis-ready indicators such as initial,
+final, minimum, and maximum funding ratio, the first year of the minimum and
+maximum values, years below 100%, years below the target funding ratio, and
+underfunding flags.
+
+This summary adds no new financial mathematics; it is a validated aggregation
+of the existing `funding_ratio_trajectory`.
 
 ## Reproducibility
 
@@ -188,7 +201,9 @@ python examples/stage1_baseline.py
 ```
 
 CSV outputs are written to `outputs/stage1_baseline/` relative to the working
-directory and contain exactly the columns of the in-memory DataFrames.
+directory and contain exactly the columns of the in-memory DataFrames,
+including `asset_snapshots.csv`, `funding_ratio_trajectory.csv`, and
+`funding_summary.csv`.
 
 ## Interpretation Warning
 

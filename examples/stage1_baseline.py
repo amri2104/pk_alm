@@ -26,6 +26,24 @@ if __name__ == "__main__":
         f"Final funding ratio %    : "
         f"{result.funding_ratio_trajectory.iloc[-1]['funding_ratio_percent']:.2f}"
     )
+    summary = result.funding_summary.iloc[0]
+    print(
+        f"Minimum funding ratio %  : "
+        f"{summary['minimum_funding_ratio_percent']:.2f}"
+    )
+    print(
+        f"Minimum funding year     : "
+        f"{int(summary['minimum_funding_ratio_year'])}"
+    )
+    print(
+        f"Years below 100%         : "
+        f"{int(summary['years_below_100_percent'])}"
+    )
+    print(
+        f"Years below target       : "
+        f"{int(summary['years_below_target_percent'])}"
+    )
+    print(f"Final underfunded        : {summary['final_underfunded']}")
     print(
         f"Inflection year (struct) : "
         f"{result.liquidity_inflection_year_structural}"

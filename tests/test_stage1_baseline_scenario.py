@@ -10,6 +10,10 @@ from pk_alm.analytics.funding import (
     FUNDING_RATIO_COLUMNS,
     validate_funding_ratio_dataframe,
 )
+from pk_alm.analytics.funding_summary import (
+    FUNDING_SUMMARY_COLUMNS,
+    validate_funding_summary_dataframe,
+)
 from pk_alm.assets.deterministic import (
     ASSET_SNAPSHOT_COLUMNS,
     validate_asset_dataframe,
@@ -62,6 +66,7 @@ def test_run_without_export_returns_valid_result():
     assert validate_annual_cashflow_dataframe(result.annual_cashflows) is True
     assert validate_asset_dataframe(result.asset_snapshots) is True
     assert validate_funding_ratio_dataframe(result.funding_ratio_trajectory) is True
+    assert validate_funding_summary_dataframe(result.funding_summary) is True
 
     assert len(result.engine_result.portfolio_states) == 13
     assert not result.engine_result.cashflows.empty
@@ -69,9 +74,24 @@ def test_run_without_export_returns_valid_result():
     assert len(result.annual_cashflows) == 12
     assert len(result.asset_snapshots) == 13
     assert len(result.funding_ratio_trajectory) == 13
+    assert len(result.funding_summary) == 1
     assert result.funding_ratio_trajectory.iloc[0][
         "funding_ratio_percent"
     ] == pytest.approx(107.6)
+
+    summary = result.funding_summary.iloc[0]
+    trajectory = result.funding_ratio_trajectory
+    assert summary["initial_funding_ratio_percent"] == pytest.approx(107.6)
+    assert summary["final_funding_ratio_percent"] == pytest.approx(
+        trajectory.iloc[-1]["funding_ratio_percent"]
+    )
+    assert summary["minimum_funding_ratio_percent"] == pytest.approx(
+        trajectory["funding_ratio_percent"].min()
+    )
+    expected_below_100 = int(
+        (trajectory["funding_ratio_percent"] < 100.0 - 1e-5).sum()
+    )
+    assert int(summary["years_below_100_percent"]) == expected_below_100
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +146,7 @@ def test_run_with_export(tmp_path):
         "annual_cashflows",
         "asset_snapshots",
         "funding_ratio_trajectory",
+        "funding_summary",
     }
 
     for key, path in result.output_paths.items():
@@ -139,12 +160,14 @@ def test_run_with_export(tmp_path):
     re_annual = pd.read_csv(result.output_paths["annual_cashflows"])
     re_assets = pd.read_csv(result.output_paths["asset_snapshots"])
     re_funding = pd.read_csv(result.output_paths["funding_ratio_trajectory"])
+    re_funding_summary = pd.read_csv(result.output_paths["funding_summary"])
 
     assert not re_cashflows.empty
     assert not re_valuation.empty
     assert not re_annual.empty
     assert not re_assets.empty
     assert not re_funding.empty
+    assert not re_funding_summary.empty
 
     assert list(re_cashflows.columns) == list(
         result.engine_result.cashflows.columns
@@ -153,6 +176,7 @@ def test_run_with_export(tmp_path):
     assert list(re_annual.columns) == list(result.annual_cashflows.columns)
     assert list(re_assets.columns) == list(ASSET_SNAPSHOT_COLUMNS)
     assert list(re_funding.columns) == list(FUNDING_RATIO_COLUMNS)
+    assert list(re_funding_summary.columns) == list(FUNDING_SUMMARY_COLUMNS)
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +244,7 @@ def _good_result_kwargs():
         annual_cashflows=res.annual_cashflows,
         asset_snapshots=res.asset_snapshots,
         funding_ratio_trajectory=res.funding_ratio_trajectory,
+        funding_summary=res.funding_summary,
         liquidity_inflection_year_structural=None,
         liquidity_inflection_year_net=None,
         output_paths={},
@@ -292,6 +317,20 @@ def test_construct_with_invalid_funding_ratio_trajectory_raises():
 def test_construct_with_non_dataframe_funding_ratio_trajectory_raises():
     kw = _good_result_kwargs()
     kw["funding_ratio_trajectory"] = "not a df"
+    with pytest.raises(TypeError):
+        Stage1BaselineResult(**kw)
+
+
+def test_construct_with_invalid_funding_summary_raises():
+    kw = _good_result_kwargs()
+    kw["funding_summary"] = pd.DataFrame({"foo": [1]})
+    with pytest.raises(ValueError):
+        Stage1BaselineResult(**kw)
+
+
+def test_construct_with_non_dataframe_funding_summary_raises():
+    kw = _good_result_kwargs()
+    kw["funding_summary"] = "not a df"
     with pytest.raises(TypeError):
         Stage1BaselineResult(**kw)
 
@@ -389,8 +428,15 @@ def test_horizon_zero_minimal_run():
     assert result.annual_cashflows.empty
     assert len(result.asset_snapshots) == 1
     assert len(result.funding_ratio_trajectory) == 1
+    assert len(result.funding_summary) == 1
     assert result.funding_ratio_trajectory.iloc[0][
         "funding_ratio_percent"
     ] == pytest.approx(107.6)
+    summary = result.funding_summary.iloc[0]
+    assert summary["initial_funding_ratio_percent"] == pytest.approx(107.6)
+    assert summary["final_funding_ratio_percent"] == pytest.approx(107.6)
+    assert summary["minimum_funding_ratio_percent"] == pytest.approx(107.6)
+    assert summary["maximum_funding_ratio_percent"] == pytest.approx(107.6)
+    assert int(summary["years_below_100_percent"]) == 0
     assert result.liquidity_inflection_year_structural is None
     assert result.liquidity_inflection_year_net is None

@@ -7,9 +7,10 @@ current implementation covers BVG formulas, cohort dataclasses, portfolio state
 and projections, retirement transitions, BVG cashflow generation, multi-year
 liability projection, deterministic liability valuation snapshots, annual
 liquidity analytics, deterministic asset roll-forward, funding-ratio trajectory,
-and an end-to-end demo scenario with CSV export.
+funding-ratio summary analytics, and an end-to-end demo scenario with CSV
+export.
 
-The full test suite currently passes with **508 passed**.
+The full test suite currently passes with **549 passed**.
 
 ## Sprint Summary
 
@@ -28,6 +29,7 @@ The full test suite currently passes with **508 passed**.
 | Sprint 2F | Annual cashflow analytics | `src/pk_alm/analytics/cashflows.py`, `tests/test_analytics_cashflows.py` | Aggregate cashflows by year and compute structural/net liquidity inflection years. | Grouping, cumulative sums, structural vs net cashflow, currency validation, dtype robustness. |
 | Sprint 2G | Stage-1 baseline scenario | `src/pk_alm/scenarios/stage1_baseline.py`, `examples/stage1_baseline.py`, `tests/test_stage1_baseline_scenario.py` | End-to-end demonstrator: engine → valuation → analytics → CSV export. | Default portfolio, export, import safety, custom horizon, parameter pass-through. |
 | Sprint 3A | Deterministic asset baseline and funding ratio | `src/pk_alm/assets/deterministic.py`, `src/pk_alm/analytics/funding.py`, `tests/test_assets_deterministic.py`, `tests/test_analytics_funding.py` | Calibrate initial assets from target funding ratio, roll assets forward using annual net cashflow and deterministic return, compute funding-ratio trajectory. | Initial asset calibration, one-year asset projection, asset trajectory, start_year/reporting_year alignment, funding-ratio validation, scenario integration. |
+| Sprint 3B | Funding-ratio summary analytics | `src/pk_alm/analytics/funding_summary.py`, `tests/test_analytics_funding_summary.py` | Summarize funding-ratio trajectories into a compact thesis-ready result table. | Initial/final/min/max funding ratios, underfunding counts, target comparison, tie handling, validation, scenario integration. |
 
 ## Current Architecture
 
@@ -44,7 +46,8 @@ The codebase is organised into seven layers, each tested independently:
 5. **Asset layer** — deterministic initial asset calibration and asset
    roll-forward snapshots.
 6. **Analytics layer** — annual cashflow aggregation, structural/net liquidity
-   inflection year detection, and funding-ratio trajectory.
+   inflection year detection, funding-ratio trajectory, and funding-ratio
+   summary.
 7. **Scenario layer** — a reproducible Stage-1 demo runner with CSV export.
 
 ## Current End-to-End Demo
@@ -63,6 +66,7 @@ Expected output includes:
 - the number of asset snapshot rows,
 - the number of funding-ratio rows,
 - the initial and final funding ratio,
+- the minimum funding ratio and funding summary indicators,
 - the structural liquidity inflection year,
 - the net liquidity inflection year,
 - the paths to the CSV outputs.
@@ -74,6 +78,7 @@ Generated CSV files (relative to the working directory):
 - `outputs/stage1_baseline/annual_cashflows.csv`
 - `outputs/stage1_baseline/asset_snapshots.csv`
 - `outputs/stage1_baseline/funding_ratio_trajectory.csv`
+- `outputs/stage1_baseline/funding_summary.csv`
 
 ## Current Test Status
 
@@ -81,7 +86,7 @@ Generated CSV files (relative to the working directory):
 python -m pytest -v
 ```
 
-Current expected result: **508 passed**.
+Current expected result: **549 passed**.
 
 The tests are part of the verification strategy for the bachelor thesis. They
 serve as executable documentation: every financial formula has at least one
