@@ -22,7 +22,7 @@ python -m pytest -v
 Expected current test status:
 
 ```text
-584 passed
+620 passed
 ```
 
 Run the deterministic Stage-1 baseline example:
@@ -98,7 +98,9 @@ next to a calendar field.
 - No inflation or pension indexation.
 - No survivor or disability benefits.
 - No stochastic rates.
-- No ACTUS/AAL integration yet.
+- A minimal ACTUS/AAL-style adapter boundary exists, but it is not wired into
+  this output run and does not add scenario output files. Full ACTUS/AAL
+  scenario integration remains deferred, and AAL is not installed or used.
 - No technical reserves yet.
 - `total_stage1_liability` is a deterministic Stage-1 proxy, not a full
   actuarial technical liability.

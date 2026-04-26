@@ -35,7 +35,8 @@ def test_progress_doc_mentions_first_and_last_sprint_and_test_count():
     assert "Sprint 3C" in text
     assert "Sprint 3D" in text
     assert "Sprint 3E" in text
-    assert "584 passed" in text
+    assert "Sprint 4A" in text
+    assert "620 passed" in text
 
 
 def test_pipeline_doc_mentions_key_functions():
@@ -59,11 +60,15 @@ def test_pipeline_doc_mentions_key_functions():
         ]
     )
     assert "scenario_summary.csv" in combined
-    assert "584 passed" in combined
+    assert "actus_adapter.py" in combined
+    assert "620 passed" in combined
     for outdated in (
         "No funding ratio logic",
         "Asset-side modelling is not yet implemented",
         "No assets/funding ratio yet",
+        "full ACTUS integration exists",
+        "AAL is installed",
+        "AAL is used in the Stage-1 baseline",
     ):
         assert outdated not in combined
 

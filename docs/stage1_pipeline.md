@@ -88,6 +88,17 @@ Sign convention from the pension fund's perspective:
 - negative `payoff` = cash outflow from the pension fund,
 - zero `payoff` = state update only.
 
+### Minimal ACTUS Adapter Boundary
+
+Sprint 4A adds `src/pk_alm/adapters/actus_adapter.py`, a small boundary that
+maps simplified ACTUS/AAL-style event dictionaries to canonical
+`CashflowRecord` objects and schema-valid DataFrames with `source="ACTUS"`.
+This preserves the shared cashflow schema as the integration contract.
+
+The adapter is not wired into `run_stage1_baseline(...)`, does not change the
+seven Stage-1 CSV outputs, and does not install, import, or call AAL. The
+deterministic BVG baseline remains the reference Stage-1 scenario.
+
 ## Step 4 — Valuation Snapshots
 
 `value_portfolio_states` builds one valuation row per portfolio state in the

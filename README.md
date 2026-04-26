@@ -14,9 +14,11 @@ transparent liability proxy with deterministic funding-ratio reporting.
   implemented.
 - Scenario-level result summary implemented for thesis-ready baseline
   reporting.
+- Minimal ACTUS/AAL-style adapter boundary implemented for mapping simplified
+  event dictionaries into the shared cashflow schema.
 - An end-to-end scenario is available as both a library function and a
   manual-run script.
-- Current tests: **584 passed**.
+- Current tests: **620 passed**.
 
 ## Quick Run
 
@@ -70,7 +72,10 @@ The current implementation is the **deterministic Stage-1 baseline**:
 - Deterministic asset roll-forward, funding-ratio trajectory, and funding
   summary are included.
 - Scenario-level result summary export is included.
-- No ACTUS/AAL integration yet.
+- A minimal ACTUS/AAL-style adapter boundary exists for schema-compatible
+  cashflow conversion.
+- Full ACTUS/AAL scenario integration is not implemented yet.
+- AAL is not installed, imported, or used by the Stage-1 baseline.
 - No stochastic interest-rate scenarios yet.
 - No mortality, new entrants, wage growth, inflation, survivor benefits, or
   disability benefits.
