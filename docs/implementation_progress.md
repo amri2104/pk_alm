@@ -8,7 +8,7 @@ and projections, retirement transitions, BVG cashflow generation, multi-year
 liability projection, deterministic liability valuation snapshots, annual
 liquidity analytics, and an end-to-end demo scenario with CSV export.
 
-The full test suite currently passes with **414 passed**.
+The full test suite currently passes with **420 passed**.
 
 ## Sprint Summary
 
@@ -72,7 +72,7 @@ Generated CSV files (relative to the working directory):
 python -m pytest -v
 ```
 
-Current expected result: **414 passed**.
+Current expected result: **420 passed**.
 
 The tests are part of the verification strategy for the bachelor thesis. They
 serve as executable documentation: every financial formula has at least one

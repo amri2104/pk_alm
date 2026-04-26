@@ -12,7 +12,7 @@ transparent liability proxy.
 - Deterministic Stage-1 BVG liability baseline implemented end-to-end.
 - An end-to-end scenario is available as both a library function and a
   manual-run script.
-- Current tests: **414 passed**.
+- Current tests: **420 passed**.
 
 ## Quick Run
 
