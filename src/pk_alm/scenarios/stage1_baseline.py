@@ -41,6 +41,11 @@ from pk_alm.bvg.valuation import (
     value_portfolio_states,
 )
 from pk_alm.cashflows.schema import validate_cashflow_dataframe
+from pk_alm.scenarios.result_summary import (
+    build_scenario_result_summary,
+    scenario_result_summary_to_dataframe,
+    validate_scenario_result_dataframe,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -59,6 +64,7 @@ class Stage1BaselineResult:
     asset_snapshots: pd.DataFrame
     funding_ratio_trajectory: pd.DataFrame
     funding_summary: pd.DataFrame
+    scenario_summary: pd.DataFrame
     liquidity_inflection_year_structural: int | None
     liquidity_inflection_year_net: int | None
     output_paths: dict[str, Path]
@@ -108,6 +114,13 @@ class Stage1BaselineResult:
                 f"got {type(self.funding_summary).__name__}"
             )
         validate_funding_summary_dataframe(self.funding_summary)
+
+        if not isinstance(self.scenario_summary, pd.DataFrame):
+            raise TypeError(
+                f"scenario_summary must be a pandas DataFrame, "
+                f"got {type(self.scenario_summary).__name__}"
+            )
+        validate_scenario_result_dataframe(self.scenario_summary)
 
         # bool is a subclass of int → reject before the int check.
         for fname in (
@@ -186,6 +199,7 @@ def build_default_stage1_portfolio() -> BVGPortfolioState:
 
 def run_stage1_baseline(
     *,
+    scenario_id: str = "stage1_baseline",
     horizon_years: int = 12,
     start_year: int = 2026,
     active_interest_rate: float = 0.0176,
@@ -255,6 +269,19 @@ def run_stage1_baseline(
         annual_cashflows, use_structural=False
     )
 
+    scenario_summary_obj = build_scenario_result_summary(
+        scenario_id=scenario_id,
+        valuation_snapshots=valuation_snapshots,
+        annual_cashflows=annual_cashflows,
+        asset_snapshots=asset_snapshots,
+        funding_ratio_trajectory=funding_ratio_trajectory,
+        funding_summary=funding_summary,
+        liquidity_inflection_year_structural=inflection_structural,
+        liquidity_inflection_year_net=inflection_net,
+    )
+    scenario_summary = scenario_result_summary_to_dataframe(scenario_summary_obj)
+    validate_scenario_result_dataframe(scenario_summary)
+
     output_paths: dict[str, Path] = {}
     if output_dir is not None:
         out_path = Path(output_dir)
@@ -266,6 +293,7 @@ def run_stage1_baseline(
         asset_path = out_path / "asset_snapshots.csv"
         funding_path = out_path / "funding_ratio_trajectory.csv"
         funding_summary_path = out_path / "funding_summary.csv"
+        scenario_summary_path = out_path / "scenario_summary.csv"
 
         engine_result.cashflows.to_csv(cashflows_path, index=False)
         valuation_snapshots.to_csv(valuation_path, index=False)
@@ -273,6 +301,7 @@ def run_stage1_baseline(
         asset_snapshots.to_csv(asset_path, index=False)
         funding_ratio_trajectory.to_csv(funding_path, index=False)
         funding_summary.to_csv(funding_summary_path, index=False)
+        scenario_summary.to_csv(scenario_summary_path, index=False)
 
         output_paths = {
             "cashflows": cashflows_path,
@@ -281,6 +310,7 @@ def run_stage1_baseline(
             "asset_snapshots": asset_path,
             "funding_ratio_trajectory": funding_path,
             "funding_summary": funding_summary_path,
+            "scenario_summary": scenario_summary_path,
         }
 
     return Stage1BaselineResult(
@@ -291,6 +321,7 @@ def run_stage1_baseline(
         asset_snapshots=asset_snapshots,
         funding_ratio_trajectory=funding_ratio_trajectory,
         funding_summary=funding_summary,
+        scenario_summary=scenario_summary,
         liquidity_inflection_year_structural=inflection_structural,
         liquidity_inflection_year_net=inflection_net,
         output_paths=output_paths,
