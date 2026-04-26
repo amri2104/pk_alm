@@ -16,6 +16,16 @@ if __name__ == "__main__":
     print(f"Portfolio states         : {len(result.engine_result.portfolio_states)}")
     print(f"Cashflow rows            : {len(result.engine_result.cashflows)}")
     print(f"Annual cashflow rows     : {len(result.annual_cashflows)}")
+    print(f"Asset snapshot rows      : {len(result.asset_snapshots)}")
+    print(f"Funding-ratio rows       : {len(result.funding_ratio_trajectory)}")
+    print(
+        f"Initial funding ratio %  : "
+        f"{result.funding_ratio_trajectory.iloc[0]['funding_ratio_percent']:.2f}"
+    )
+    print(
+        f"Final funding ratio %    : "
+        f"{result.funding_ratio_trajectory.iloc[-1]['funding_ratio_percent']:.2f}"
+    )
     print(
         f"Inflection year (struct) : "
         f"{result.liquidity_inflection_year_structural}"

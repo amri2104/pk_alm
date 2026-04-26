@@ -6,9 +6,10 @@ The repository now contains a deterministic Stage-1 BVG liability baseline. The
 current implementation covers BVG formulas, cohort dataclasses, portfolio state
 and projections, retirement transitions, BVG cashflow generation, multi-year
 liability projection, deterministic liability valuation snapshots, annual
-liquidity analytics, and an end-to-end demo scenario with CSV export.
+liquidity analytics, deterministic asset roll-forward, funding-ratio trajectory,
+and an end-to-end demo scenario with CSV export.
 
-The full test suite currently passes with **420 passed**.
+The full test suite currently passes with **508 passed**.
 
 ## Sprint Summary
 
@@ -26,10 +27,11 @@ The full test suite currently passes with **420 passed**.
 | Sprint 2E | Liability valuation snapshots | `src/pk_alm/bvg/valuation.py`, `tests/test_bvg_valuation.py` | Value portfolio states as deterministic Stage-1 liability snapshots. | Active-only, retired-only, terminal age, pensionierungsverlust, missing values, float tolerance. |
 | Sprint 2F | Annual cashflow analytics | `src/pk_alm/analytics/cashflows.py`, `tests/test_analytics_cashflows.py` | Aggregate cashflows by year and compute structural/net liquidity inflection years. | Grouping, cumulative sums, structural vs net cashflow, currency validation, dtype robustness. |
 | Sprint 2G | Stage-1 baseline scenario | `src/pk_alm/scenarios/stage1_baseline.py`, `examples/stage1_baseline.py`, `tests/test_stage1_baseline_scenario.py` | End-to-end demonstrator: engine → valuation → analytics → CSV export. | Default portfolio, export, import safety, custom horizon, parameter pass-through. |
+| Sprint 3A | Deterministic asset baseline and funding ratio | `src/pk_alm/assets/deterministic.py`, `src/pk_alm/analytics/funding.py`, `tests/test_assets_deterministic.py`, `tests/test_analytics_funding.py` | Calibrate initial assets from target funding ratio, roll assets forward using annual net cashflow and deterministic return, compute funding-ratio trajectory. | Initial asset calibration, one-year asset projection, asset trajectory, start_year/reporting_year alignment, funding-ratio validation, scenario integration. |
 
 ## Current Architecture
 
-The codebase is organised into six layers, each tested independently:
+The codebase is organised into seven layers, each tested independently:
 
 1. **BVG domain layer** — formulas, cohorts, portfolio state, projections,
    retirement transitions.
@@ -39,9 +41,11 @@ The codebase is organised into six layers, each tested independently:
    composes the lower layers and emits one combined cashflow DataFrame.
 4. **Valuation layer** — Stage-1 liability snapshots with the simplified
    `total_stage1_liability` proxy.
-5. **Analytics layer** — annual cashflow aggregation and structural/net
-   liquidity inflection year detection.
-6. **Scenario layer** — a reproducible Stage-1 demo runner with CSV export.
+5. **Asset layer** — deterministic initial asset calibration and asset
+   roll-forward snapshots.
+6. **Analytics layer** — annual cashflow aggregation, structural/net liquidity
+   inflection year detection, and funding-ratio trajectory.
+7. **Scenario layer** — a reproducible Stage-1 demo runner with CSV export.
 
 ## Current End-to-End Demo
 
@@ -56,6 +60,9 @@ Expected output includes:
 - the number of portfolio states,
 - the number of cashflow rows,
 - the number of annual cashflow rows,
+- the number of asset snapshot rows,
+- the number of funding-ratio rows,
+- the initial and final funding ratio,
 - the structural liquidity inflection year,
 - the net liquidity inflection year,
 - the paths to the CSV outputs.
@@ -65,6 +72,8 @@ Generated CSV files (relative to the working directory):
 - `outputs/stage1_baseline/cashflows.csv`
 - `outputs/stage1_baseline/valuation_snapshots.csv`
 - `outputs/stage1_baseline/annual_cashflows.csv`
+- `outputs/stage1_baseline/asset_snapshots.csv`
+- `outputs/stage1_baseline/funding_ratio_trajectory.csv`
 
 ## Current Test Status
 
@@ -72,7 +81,7 @@ Generated CSV files (relative to the working directory):
 python -m pytest -v
 ```
 
-Current expected result: **420 passed**.
+Current expected result: **508 passed**.
 
 The tests are part of the verification strategy for the bachelor thesis. They
 serve as executable documentation: every financial formula has at least one
@@ -93,17 +102,14 @@ The current implementation is intentionally narrow:
 - No survivor benefits or disability benefits.
 - No stochastic interest-rate scenarios in this Stage-1 baseline.
 - No ACTUS asset integration.
-- No funding ratio logic.
+- No multi-asset allocation, rebalancing, or market-data ingestion.
 - `total_stage1_liability` is **not** a full actuarial technical liability. It
   is a deterministic Stage-1 proxy and intentionally excludes technical
   provisions / technical reserves (longevity, risk, fluctuation, additional
   reserves for pension losses).
-- Asset-side modelling is not yet implemented.
+- Asset-side modelling is limited to a deterministic aggregate baseline.
 
 ## Next Planned Step
 
-Sprint 3A should implement a deterministic asset baseline and a funding ratio
-trajectory. The purpose is to combine asset values with `total_stage1_liability`
-to produce an interpretable funding ratio over time. Funding ratio logic should
-be introduced only after a minimal asset baseline exists, so that the funding
-ratio is well-defined and reproducible from explicit inputs.
+The next sprint should build on the deterministic asset and funding-ratio
+baseline without adding stochastic rates or ACTUS as hard dependencies.

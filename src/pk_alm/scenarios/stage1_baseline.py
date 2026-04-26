@@ -2,7 +2,7 @@
 
 Wires together the BVG engine, liability valuation, and annual cashflow
 analytics over a small deterministic test/demo portfolio. Optionally exports
-three CSVs (cashflows, valuation snapshots, annual cashflows) to a directory.
+CSV outputs to a directory.
 
 This is an integration scenario, not a calibrated pension fund. It introduces
 no new financial mathematics.
@@ -19,6 +19,14 @@ from pk_alm.analytics.cashflows import (
     find_liquidity_inflection_year,
     summarize_cashflows_by_year,
     validate_annual_cashflow_dataframe,
+)
+from pk_alm.analytics.funding import (
+    build_funding_ratio_trajectory,
+    validate_funding_ratio_dataframe,
+)
+from pk_alm.assets.deterministic import (
+    build_deterministic_asset_trajectory,
+    validate_asset_dataframe,
 )
 from pk_alm.bvg.cohorts import ActiveCohort, RetiredCohort
 from pk_alm.bvg.engine import BVGEngineResult, run_bvg_engine
@@ -43,6 +51,8 @@ class Stage1BaselineResult:
     engine_result: BVGEngineResult
     valuation_snapshots: pd.DataFrame
     annual_cashflows: pd.DataFrame
+    asset_snapshots: pd.DataFrame
+    funding_ratio_trajectory: pd.DataFrame
     liquidity_inflection_year_structural: int | None
     liquidity_inflection_year_net: int | None
     output_paths: dict[str, Path]
@@ -71,6 +81,20 @@ class Stage1BaselineResult:
                 f"got {type(self.annual_cashflows).__name__}"
             )
         validate_annual_cashflow_dataframe(self.annual_cashflows)
+
+        if not isinstance(self.asset_snapshots, pd.DataFrame):
+            raise TypeError(
+                f"asset_snapshots must be a pandas DataFrame, "
+                f"got {type(self.asset_snapshots).__name__}"
+            )
+        validate_asset_dataframe(self.asset_snapshots)
+
+        if not isinstance(self.funding_ratio_trajectory, pd.DataFrame):
+            raise TypeError(
+                f"funding_ratio_trajectory must be a pandas DataFrame, "
+                f"got {type(self.funding_ratio_trajectory).__name__}"
+            )
+        validate_funding_ratio_dataframe(self.funding_ratio_trajectory)
 
         # bool is a subclass of int → reject before the int check.
         for fname in (
@@ -159,6 +183,8 @@ def run_stage1_baseline(
     capital_withdrawal_fraction: float = 0.35,
     conversion_rate: float = 0.068,
     valuation_terminal_age: int = 90,
+    target_funding_ratio: float = 1.076,
+    annual_asset_return: float = 0.0,
     output_dir: str | Path | None = None,
 ) -> Stage1BaselineResult:
     """Run the Stage-1 baseline scenario end-to-end and optionally export CSVs."""
@@ -187,6 +213,21 @@ def run_stage1_baseline(
     annual_cashflows = summarize_cashflows_by_year(engine_result.cashflows)
     validate_annual_cashflow_dataframe(annual_cashflows)
 
+    asset_snapshots = build_deterministic_asset_trajectory(
+        valuation_snapshots,
+        annual_cashflows,
+        target_funding_ratio=target_funding_ratio,
+        annual_return_rate=annual_asset_return,
+        start_year=start_year,
+    )
+    validate_asset_dataframe(asset_snapshots)
+
+    funding_ratio_trajectory = build_funding_ratio_trajectory(
+        asset_snapshots,
+        valuation_snapshots,
+    )
+    validate_funding_ratio_dataframe(funding_ratio_trajectory)
+
     inflection_structural = find_liquidity_inflection_year(
         annual_cashflows, use_structural=True
     )
@@ -202,15 +243,21 @@ def run_stage1_baseline(
         cashflows_path = out_path / "cashflows.csv"
         valuation_path = out_path / "valuation_snapshots.csv"
         annual_path = out_path / "annual_cashflows.csv"
+        asset_path = out_path / "asset_snapshots.csv"
+        funding_path = out_path / "funding_ratio_trajectory.csv"
 
         engine_result.cashflows.to_csv(cashflows_path, index=False)
         valuation_snapshots.to_csv(valuation_path, index=False)
         annual_cashflows.to_csv(annual_path, index=False)
+        asset_snapshots.to_csv(asset_path, index=False)
+        funding_ratio_trajectory.to_csv(funding_path, index=False)
 
         output_paths = {
             "cashflows": cashflows_path,
             "valuation_snapshots": valuation_path,
             "annual_cashflows": annual_path,
+            "asset_snapshots": asset_path,
+            "funding_ratio_trajectory": funding_path,
         }
 
     return Stage1BaselineResult(
@@ -218,6 +265,8 @@ def run_stage1_baseline(
         engine_result=engine_result,
         valuation_snapshots=valuation_snapshots,
         annual_cashflows=annual_cashflows,
+        asset_snapshots=asset_snapshots,
+        funding_ratio_trajectory=funding_ratio_trajectory,
         liquidity_inflection_year_structural=inflection_structural,
         liquidity_inflection_year_net=inflection_net,
         output_paths=output_paths,

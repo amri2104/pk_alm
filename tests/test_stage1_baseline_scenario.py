@@ -6,6 +6,14 @@ from pk_alm.analytics.cashflows import (
     find_liquidity_inflection_year,
     validate_annual_cashflow_dataframe,
 )
+from pk_alm.analytics.funding import (
+    FUNDING_RATIO_COLUMNS,
+    validate_funding_ratio_dataframe,
+)
+from pk_alm.assets.deterministic import (
+    ASSET_SNAPSHOT_COLUMNS,
+    validate_asset_dataframe,
+)
 from pk_alm.bvg.engine import BVGEngineResult
 from pk_alm.bvg.portfolio import BVGPortfolioState
 from pk_alm.bvg.valuation import validate_valuation_dataframe
@@ -52,11 +60,18 @@ def test_run_without_export_returns_valid_result():
     assert validate_cashflow_dataframe(result.engine_result.cashflows) is True
     assert validate_valuation_dataframe(result.valuation_snapshots) is True
     assert validate_annual_cashflow_dataframe(result.annual_cashflows) is True
+    assert validate_asset_dataframe(result.asset_snapshots) is True
+    assert validate_funding_ratio_dataframe(result.funding_ratio_trajectory) is True
 
     assert len(result.engine_result.portfolio_states) == 13
     assert not result.engine_result.cashflows.empty
     assert len(result.valuation_snapshots) == 13
     assert len(result.annual_cashflows) == 12
+    assert len(result.asset_snapshots) == 13
+    assert len(result.funding_ratio_trajectory) == 13
+    assert result.funding_ratio_trajectory.iloc[0][
+        "funding_ratio_percent"
+    ] == pytest.approx(107.6)
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +124,8 @@ def test_run_with_export(tmp_path):
         "cashflows",
         "valuation_snapshots",
         "annual_cashflows",
+        "asset_snapshots",
+        "funding_ratio_trajectory",
     }
 
     for key, path in result.output_paths.items():
@@ -120,16 +137,22 @@ def test_run_with_export(tmp_path):
     re_cashflows = pd.read_csv(result.output_paths["cashflows"])
     re_valuation = pd.read_csv(result.output_paths["valuation_snapshots"])
     re_annual = pd.read_csv(result.output_paths["annual_cashflows"])
+    re_assets = pd.read_csv(result.output_paths["asset_snapshots"])
+    re_funding = pd.read_csv(result.output_paths["funding_ratio_trajectory"])
 
     assert not re_cashflows.empty
     assert not re_valuation.empty
     assert not re_annual.empty
+    assert not re_assets.empty
+    assert not re_funding.empty
 
     assert list(re_cashflows.columns) == list(
         result.engine_result.cashflows.columns
     )
     assert list(re_valuation.columns) == list(result.valuation_snapshots.columns)
     assert list(re_annual.columns) == list(result.annual_cashflows.columns)
+    assert list(re_assets.columns) == list(ASSET_SNAPSHOT_COLUMNS)
+    assert list(re_funding.columns) == list(FUNDING_RATIO_COLUMNS)
 
 
 # ---------------------------------------------------------------------------
@@ -142,11 +165,31 @@ def test_parameter_pass_through_horizon_and_multiplier():
         horizon_years=1,
         start_year=2030,
         contribution_multiplier=2.0,
+        target_funding_ratio=1.2,
+        annual_asset_return=0.03,
         output_dir=None,
     )
     assert len(result.engine_result.portfolio_states) == 2
     assert len(result.annual_cashflows) == 1
+    assert len(result.asset_snapshots) == 2
+    assert len(result.funding_ratio_trajectory) == 2
     assert int(result.annual_cashflows.iloc[0]["reporting_year"]) == 2030
+    assert result.funding_ratio_trajectory.iloc[0][
+        "funding_ratio_percent"
+    ] == pytest.approx(120.0)
+
+    expected_year_1_cashflow = float(
+        result.annual_cashflows.loc[
+            result.annual_cashflows["reporting_year"] == 2030,
+            "net_cashflow",
+        ].iloc[0]
+    )
+    assert result.asset_snapshots.iloc[1]["net_cashflow"] == pytest.approx(
+        expected_year_1_cashflow
+    )
+    assert result.asset_snapshots.iloc[1]["investment_return"] == pytest.approx(
+        result.asset_snapshots.iloc[1]["opening_asset_value"] * 0.03
+    )
 
     df = result.engine_result.cashflows
     pr_rows = df[df["type"] == "PR"]
@@ -175,6 +218,8 @@ def _good_result_kwargs():
         engine_result=res.engine_result,
         valuation_snapshots=res.valuation_snapshots,
         annual_cashflows=res.annual_cashflows,
+        asset_snapshots=res.asset_snapshots,
+        funding_ratio_trajectory=res.funding_ratio_trajectory,
         liquidity_inflection_year_structural=None,
         liquidity_inflection_year_net=None,
         output_paths={},
@@ -219,6 +264,34 @@ def test_construct_with_invalid_annual_cashflows_raises():
 def test_construct_with_non_dataframe_annual_raises():
     kw = _good_result_kwargs()
     kw["annual_cashflows"] = "not a df"
+    with pytest.raises(TypeError):
+        Stage1BaselineResult(**kw)
+
+
+def test_construct_with_invalid_asset_snapshots_raises():
+    kw = _good_result_kwargs()
+    kw["asset_snapshots"] = pd.DataFrame({"foo": [1]})
+    with pytest.raises(ValueError):
+        Stage1BaselineResult(**kw)
+
+
+def test_construct_with_non_dataframe_asset_snapshots_raises():
+    kw = _good_result_kwargs()
+    kw["asset_snapshots"] = "not a df"
+    with pytest.raises(TypeError):
+        Stage1BaselineResult(**kw)
+
+
+def test_construct_with_invalid_funding_ratio_trajectory_raises():
+    kw = _good_result_kwargs()
+    kw["funding_ratio_trajectory"] = pd.DataFrame({"foo": [1]})
+    with pytest.raises(ValueError):
+        Stage1BaselineResult(**kw)
+
+
+def test_construct_with_non_dataframe_funding_ratio_trajectory_raises():
+    kw = _good_result_kwargs()
+    kw["funding_ratio_trajectory"] = "not a df"
     with pytest.raises(TypeError):
         Stage1BaselineResult(**kw)
 
@@ -314,5 +387,10 @@ def test_horizon_zero_minimal_run():
     assert result.engine_result.cashflows.empty
     assert len(result.valuation_snapshots) == 1
     assert result.annual_cashflows.empty
+    assert len(result.asset_snapshots) == 1
+    assert len(result.funding_ratio_trajectory) == 1
+    assert result.funding_ratio_trajectory.iloc[0][
+        "funding_ratio_percent"
+    ] == pytest.approx(107.6)
     assert result.liquidity_inflection_year_structural is None
     assert result.liquidity_inflection_year_net is None

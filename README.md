@@ -10,9 +10,10 @@ transparent liability proxy.
 ## Current Status
 
 - Deterministic Stage-1 BVG liability baseline implemented end-to-end.
+- Deterministic asset baseline and funding-ratio trajectory implemented.
 - An end-to-end scenario is available as both a library function and a
   manual-run script.
-- Current tests: **420 passed**.
+- Current tests: **508 passed**.
 
 ## Quick Run
 
@@ -30,7 +31,7 @@ python examples/stage1_baseline.py
 
 ## Generated Outputs
 
-Running the demo writes three CSV files to
+Running the demo writes five CSV files to
 `outputs/stage1_baseline/` (relative to the working directory):
 
 - `outputs/stage1_baseline/cashflows.csv` — schema-valid BVG cashflows.
@@ -38,6 +39,10 @@ Running the demo writes three CSV files to
   snapshots per projection year.
 - `outputs/stage1_baseline/annual_cashflows.csv` — annual cashflow
   analytics including the liquidity inflection year.
+- `outputs/stage1_baseline/asset_snapshots.csv` — deterministic asset
+  roll-forward snapshots.
+- `outputs/stage1_baseline/funding_ratio_trajectory.csv` — funding-ratio
+  trajectory based on `total_stage1_liability`.
 
 ## Documentation
 
@@ -51,10 +56,9 @@ Running the demo writes three CSV files to
 
 ## Scope
 
-The current implementation is the **liability-side deterministic Stage-1
-baseline**:
+The current implementation is the **deterministic Stage-1 baseline**:
 
-- No assets and no funding ratio yet.
+- Deterministic asset roll-forward and funding-ratio trajectory are included.
 - No ACTUS integration yet.
 - No stochastic interest-rate scenarios yet.
 - No mortality, new entrants, wage growth, inflation, survivor benefits, or

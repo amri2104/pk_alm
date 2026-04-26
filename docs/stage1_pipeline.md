@@ -14,8 +14,10 @@ build_default_stage1_portfolio()
     → run_bvg_engine(...)
         → value_portfolio_states(...)
             → summarize_cashflows_by_year(...)
-                → find_liquidity_inflection_year(...)
-                    → optional CSV export
+                → build_deterministic_asset_trajectory(...)
+                    → build_funding_ratio_trajectory(...)
+                        → find_liquidity_inflection_year(...)
+                            → optional CSV export
 ```
 
 Each step is a thin coordinator over already-tested components. The pipeline
@@ -136,6 +138,40 @@ chosen net cashflow is strictly negative:
 
 Both values are stored on the `Stage1BaselineResult` so callers do not have
 to re-call the function.
+
+## Step 7 — Asset Snapshots
+
+`build_deterministic_asset_trajectory` calibrates initial assets from the
+opening liability proxy and target funding ratio:
+
+```text
+initial assets = total_stage1_liability(0) * target funding ratio
+```
+
+For each later projection year, assets are rolled forward with a deterministic
+return on opening assets and the annual `net_cashflow` settled at year-end:
+
+```text
+closing_asset_value = opening_asset_value * (1 + annual_return_rate)
+                    + net_cashflow
+```
+
+The asset trajectory explicitly maps `projection_year` to calendar
+`reporting_year` using the scenario `start_year`. It does not infer this
+mapping from the first annual cashflow row.
+
+## Step 8 — Funding Ratio
+
+`build_funding_ratio_trajectory` combines asset snapshots with valuation
+snapshots:
+
+```text
+funding_ratio = closing_asset_value / total_stage1_liability
+funding_ratio_percent = funding_ratio * 100
+```
+
+The denominator is the current deterministic Stage-1 liability proxy,
+`total_stage1_liability`. Technical reserves remain excluded.
 
 ## Reproducibility
 
