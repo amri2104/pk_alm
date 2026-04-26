@@ -7,10 +7,10 @@ current implementation covers BVG formulas, cohort dataclasses, portfolio state
 and projections, retirement transitions, BVG cashflow generation, multi-year
 liability projection, deterministic liability valuation snapshots, annual
 liquidity analytics, deterministic asset roll-forward, funding-ratio trajectory,
-funding-ratio summary analytics, and an end-to-end demo scenario with CSV
-export.
+funding-ratio summary analytics, scenario-level result summary reporting, and
+an end-to-end demo scenario with CSV export.
 
-The full test suite currently passes with **549 passed**.
+The full test suite currently passes with **582 passed**.
 
 ## Sprint Summary
 
@@ -30,6 +30,7 @@ The full test suite currently passes with **549 passed**.
 | Sprint 2G | Stage-1 baseline scenario | `src/pk_alm/scenarios/stage1_baseline.py`, `examples/stage1_baseline.py`, `tests/test_stage1_baseline_scenario.py` | End-to-end demonstrator: engine → valuation → analytics → CSV export. | Default portfolio, export, import safety, custom horizon, parameter pass-through. |
 | Sprint 3A | Deterministic asset baseline and funding ratio | `src/pk_alm/assets/deterministic.py`, `src/pk_alm/analytics/funding.py`, `tests/test_assets_deterministic.py`, `tests/test_analytics_funding.py` | Calibrate initial assets from target funding ratio, roll assets forward using annual net cashflow and deterministic return, compute funding-ratio trajectory. | Initial asset calibration, one-year asset projection, asset trajectory, start_year/reporting_year alignment, funding-ratio validation, scenario integration. |
 | Sprint 3B | Funding-ratio summary analytics | `src/pk_alm/analytics/funding_summary.py`, `tests/test_analytics_funding_summary.py` | Summarize funding-ratio trajectories into a compact thesis-ready result table. | Initial/final/min/max funding ratios, underfunding counts, target comparison, tie handling, validation, scenario integration. |
+| Sprint 3C | Scenario result summary table | `src/pk_alm/scenarios/result_summary.py`, `tests/test_scenario_result_summary.py` | Build one-row scenario summary for thesis-ready baseline result reporting. | Standard scenario summary, horizon zero, invalid inputs, optional inflection fields, DataFrame conversion, export integration. |
 
 ## Current Architecture
 
@@ -48,7 +49,8 @@ The codebase is organised into seven layers, each tested independently:
 6. **Analytics layer** — annual cashflow aggregation, structural/net liquidity
    inflection year detection, funding-ratio trajectory, and funding-ratio
    summary.
-7. **Scenario layer** — a reproducible Stage-1 demo runner with CSV export.
+7. **Scenario layer** — a reproducible Stage-1 demo runner with scenario
+   result summary and CSV export.
 
 ## Current End-to-End Demo
 
@@ -65,6 +67,7 @@ Expected output includes:
 - the number of annual cashflow rows,
 - the number of asset snapshot rows,
 - the number of funding-ratio rows,
+- the scenario ID,
 - the initial and final funding ratio,
 - the minimum funding ratio and funding summary indicators,
 - the structural liquidity inflection year,
@@ -79,6 +82,7 @@ Generated CSV files (relative to the working directory):
 - `outputs/stage1_baseline/asset_snapshots.csv`
 - `outputs/stage1_baseline/funding_ratio_trajectory.csv`
 - `outputs/stage1_baseline/funding_summary.csv`
+- `outputs/stage1_baseline/scenario_summary.csv`
 
 ## Current Test Status
 
@@ -86,7 +90,7 @@ Generated CSV files (relative to the working directory):
 python -m pytest -v
 ```
 
-Current expected result: **549 passed**.
+Current expected result: **582 passed**.
 
 The tests are part of the verification strategy for the bachelor thesis. They
 serve as executable documentation: every financial formula has at least one
@@ -116,5 +120,7 @@ The current implementation is intentionally narrow:
 
 ## Next Planned Step
 
-The next sprint should build on the deterministic asset and funding-ratio
-baseline without adding stochastic rates or ACTUS as hard dependencies.
+Sprint 4A should be a minimal ACTUS/AAL adapter exploration, not full
+integration. The deterministic Stage-1 baseline should remain the reference
+baseline while adapter boundaries, data-shape compatibility, and dependency
+options are explored.
