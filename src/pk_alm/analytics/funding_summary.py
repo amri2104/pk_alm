@@ -16,9 +16,9 @@ FUNDING_SUMMARY_COLUMNS = (
     "initial_funding_ratio_percent",
     "final_funding_ratio_percent",
     "minimum_funding_ratio_percent",
-    "minimum_funding_ratio_year",
+    "minimum_funding_ratio_projection_year",
     "maximum_funding_ratio_percent",
-    "maximum_funding_ratio_year",
+    "maximum_funding_ratio_projection_year",
     "target_funding_ratio_percent",
     "years_below_100_percent",
     "years_below_target_percent",
@@ -84,6 +84,25 @@ def _validate_non_empty_string(value: object, name: str) -> str:
     return value
 
 
+def _coerce_bool(value: object, name: str) -> bool:
+    """Coerce Python bool, numpy bool, or 'True'/'False' strings to Python bool.
+
+    Strings are accepted to support CSV roundtrip via pandas, which writes bool
+    columns as the strings 'True' and 'False'.
+    """
+    if isinstance(value, bool):
+        return value
+    if pd.api.types.is_bool(value):
+        return bool(value)
+    if isinstance(value, str):
+        s = value.strip()
+        if s == "True":
+            return True
+        if s == "False":
+            return False
+    raise TypeError(f"{name} must be bool, got {type(value).__name__}")
+
+
 def _coerce_integer_like(value: object, name: str) -> int:
     if isinstance(value, bool):
         raise TypeError(f"{name} must not be bool")
@@ -113,9 +132,9 @@ class FundingRatioSummary:
     initial_funding_ratio_percent: float
     final_funding_ratio_percent: float
     minimum_funding_ratio_percent: float
-    minimum_funding_ratio_year: int
+    minimum_funding_ratio_projection_year: int
     maximum_funding_ratio_percent: float
-    maximum_funding_ratio_year: int
+    maximum_funding_ratio_projection_year: int
     target_funding_ratio_percent: float
     years_below_100_percent: int
     years_below_target_percent: int
@@ -141,23 +160,23 @@ class FundingRatioSummary:
             )
 
         minimum_year = _validate_non_bool_int(
-            self.minimum_funding_ratio_year,
-            "minimum_funding_ratio_year",
+            self.minimum_funding_ratio_projection_year,
+            "minimum_funding_ratio_projection_year",
             min_value=0,
         )
         maximum_year = _validate_non_bool_int(
-            self.maximum_funding_ratio_year,
-            "maximum_funding_ratio_year",
+            self.maximum_funding_ratio_projection_year,
+            "maximum_funding_ratio_projection_year",
             min_value=0,
         )
         if not start <= minimum_year <= end:
             raise ValueError(
-                "minimum_funding_ratio_year must lie between start and end "
+                "minimum_funding_ratio_projection_year must lie between start and end "
                 f"projection years ({start} <= {minimum_year} <= {end})"
             )
         if not start <= maximum_year <= end:
             raise ValueError(
-                "maximum_funding_ratio_year must lie between start and end "
+                "maximum_funding_ratio_projection_year must lie between start and end "
                 f"projection years ({start} <= {maximum_year} <= {end})"
             )
 
@@ -294,9 +313,9 @@ def summarize_funding_ratio(
         initial_funding_ratio_percent=percentages[0],
         final_funding_ratio_percent=final_percent,
         minimum_funding_ratio_percent=min_percent,
-        minimum_funding_ratio_year=min_year,
+        minimum_funding_ratio_projection_year=min_year,
         maximum_funding_ratio_percent=max_percent,
-        maximum_funding_ratio_year=max_year,
+        maximum_funding_ratio_projection_year=max_year,
         target_funding_ratio_percent=target_percent,
         years_below_100_percent=years_below_100,
         years_below_target_percent=years_below_target,
@@ -367,12 +386,14 @@ def validate_funding_summary_dataframe(df: pd.DataFrame) -> bool:
             initial_funding_ratio_percent=row["initial_funding_ratio_percent"],
             final_funding_ratio_percent=row["final_funding_ratio_percent"],
             minimum_funding_ratio_percent=row["minimum_funding_ratio_percent"],
-            minimum_funding_ratio_year=_coerce_integer_like(
-                row["minimum_funding_ratio_year"], "minimum_funding_ratio_year"
+            minimum_funding_ratio_projection_year=_coerce_integer_like(
+                row["minimum_funding_ratio_projection_year"],
+                "minimum_funding_ratio_projection_year",
             ),
             maximum_funding_ratio_percent=row["maximum_funding_ratio_percent"],
-            maximum_funding_ratio_year=_coerce_integer_like(
-                row["maximum_funding_ratio_year"], "maximum_funding_ratio_year"
+            maximum_funding_ratio_projection_year=_coerce_integer_like(
+                row["maximum_funding_ratio_projection_year"],
+                "maximum_funding_ratio_projection_year",
             ),
             target_funding_ratio_percent=row["target_funding_ratio_percent"],
             years_below_100_percent=_coerce_integer_like(
@@ -381,8 +402,12 @@ def validate_funding_summary_dataframe(df: pd.DataFrame) -> bool:
             years_below_target_percent=_coerce_integer_like(
                 row["years_below_target_percent"], "years_below_target_percent"
             ),
-            ever_underfunded=row["ever_underfunded"],
-            final_underfunded=row["final_underfunded"],
+            ever_underfunded=_coerce_bool(
+                row["ever_underfunded"], "ever_underfunded"
+            ),
+            final_underfunded=_coerce_bool(
+                row["final_underfunded"], "final_underfunded"
+            ),
             currency=row["currency"],
         )
 

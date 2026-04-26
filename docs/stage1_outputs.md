@@ -22,7 +22,7 @@ python -m pytest -v
 Expected current test status:
 
 ```text
-582 passed
+584 passed
 ```
 
 Run the deterministic Stage-1 baseline example:
@@ -48,8 +48,8 @@ outputs/stage1_baseline/
 | `annual_cashflows.csv` | Cashflow analytics | Yearly aggregation of contributions, pensions, KA events, net cashflow, and structural cashflow. | `reporting_year`, `contribution_cashflow`, `pension_payment_cashflow`, `capital_withdrawal_cashflow`, `net_cashflow`, `structural_net_cashflow` | Liquidity inflection analysis. |
 | `asset_snapshots.csv` | Deterministic asset baseline | Asset roll-forward using opening assets, deterministic return, and net cashflow. | `projection_year`, `opening_asset_value`, `investment_return`, `net_cashflow`, `closing_asset_value`, `annual_return_rate` | Asset-side baseline and funding-ratio numerator. |
 | `funding_ratio_trajectory.csv` | Funding analytics | Yearly funding-ratio trajectory. | `projection_year`, `asset_value`, `total_stage1_liability`, `funding_ratio`, `funding_ratio_percent` | Solvency and funding-ratio analysis over time. |
-| `funding_summary.csv` | Funding summary analytics | Compact summary of the funding-ratio trajectory. | `initial_funding_ratio_percent`, `final_funding_ratio_percent`, `minimum_funding_ratio_percent`, `years_below_100_percent`, `final_underfunded` | Result table for funding-ratio behaviour. |
-| `scenario_summary.csv` | Scenario result summary | One-row executive result summary for the whole baseline run. | `scenario_id`, `horizon_years`, `initial_total_stage1_liability`, `final_total_stage1_liability`, `initial_asset_value`, `final_asset_value`, `minimum_funding_ratio_percent`, `liquidity_inflection_year_structural` | Main baseline result table. |
+| `funding_summary.csv` | Funding summary analytics | Compact summary of the funding-ratio trajectory. | `initial_funding_ratio_percent`, `final_funding_ratio_percent`, `minimum_funding_ratio_percent`, `minimum_funding_ratio_projection_year`, `maximum_funding_ratio_projection_year`, `years_below_100_percent`, `final_underfunded` | Result table for funding-ratio behaviour. |
+| `scenario_summary.csv` | Scenario result summary | One-row executive result summary for the whole baseline run. | `scenario_id`, `horizon_years`, `start_year`, `end_year`, `initial_total_stage1_liability`, `final_total_stage1_liability`, `initial_asset_value`, `final_asset_value`, `minimum_funding_ratio_percent`, `minimum_funding_ratio_projection_year`, `liquidity_inflection_year_structural` | Main baseline result table. |
 
 ## Event Type Notes
 
@@ -64,9 +64,33 @@ The sign convention is always from the pension fund perspective:
 - Positive `payoff` means cash inflow to the pension fund.
 - Negative `payoff` means cash outflow from the pension fund.
 
+## Year Field Conventions
+
+- `start_year`, `end_year`, `liquidity_inflection_year_structural`,
+  `liquidity_inflection_year_net`: **calendar years** (e.g. 2026, 2037).
+- `projection_year`, `start_projection_year`, `end_projection_year`,
+  `minimum_funding_ratio_projection_year`,
+  `maximum_funding_ratio_projection_year`: **projection years** indexed from 0
+  (e.g. 0..12 for a 12-year horizon).
+
+This separation avoids the ambiguity of a single field named "year" appearing
+next to a calendar field.
+
+## Default Assumption Notes
+
+- `contribution_multiplier = 1.4` is a simplified contribution inflow
+  multiplier over the BVG age-credit total. It is not a measured plan
+  contribution rate.
+- `annual_asset_return = 0.0` is a conservative deterministic baseline
+  assumption used to isolate liability-driven funding-ratio dynamics. It is
+  not a return forecast; positive return scenarios may be passed explicitly.
+- `total_stage1_liability` remains a Stage-1 proxy and excludes technical
+  reserves.
+
 ## Interpretation Warnings
 
-- The default demo portfolio is intentionally small and manually inspectable.
+- The default demo portfolio is intentionally small and manually inspectable
+  and is not calibrated to a real pension fund.
 - The outputs are not calibrated to a real pension fund.
 - No mortality tables.
 - No new entrants.

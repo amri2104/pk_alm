@@ -33,8 +33,8 @@ if __name__ == "__main__":
         f"{scenario['minimum_funding_ratio_percent']:.2f}"
     )
     print(
-        f"Minimum funding year     : "
-        f"{int(scenario['minimum_funding_ratio_year'])}"
+        f"Min FR projection year   : "
+        f"{int(scenario['minimum_funding_ratio_projection_year'])}"
     )
     print(
         f"Years below 100%         : "

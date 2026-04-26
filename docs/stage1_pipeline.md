@@ -168,9 +168,15 @@ The denominator is the current deterministic Stage-1 liability proxy,
 
 `summarize_funding_ratio` produces a compact `funding_summary` table from the
 funding-ratio trajectory. It reports thesis-ready indicators such as initial,
-final, minimum, and maximum funding ratio, the first year of the minimum and
-maximum values, years below 100%, years below the target funding ratio, and
-underfunding flags.
+final, minimum, and maximum funding ratio, the projection year in which the
+minimum and maximum values first occur, years below 100%, years below the
+target funding ratio, and underfunding flags.
+
+The `minimum_funding_ratio_projection_year` and
+`maximum_funding_ratio_projection_year` fields are deliberately named to make
+it explicit that they are **projection years (0..N)**, not calendar years.
+Calendar years appear separately in the scenario summary as `start_year` and
+`end_year` and in the liquidity-inflection fields.
 
 This summary adds no new financial mathematics; it is a validated aggregation
 of the existing `funding_ratio_trajectory`.
@@ -218,6 +224,23 @@ CSV outputs are written to `outputs/stage1_baseline/` relative to the working
 directory and contain exactly the columns of the in-memory DataFrames,
 including `asset_snapshots.csv`, `funding_ratio_trajectory.csv`, and
 `funding_summary.csv`, and `scenario_summary.csv`.
+
+## Default Assumptions
+
+The `run_stage1_baseline` defaults are intentionally simple and explicit:
+
+- `contribution_multiplier = 1.4` — simplified scalar applied to the BVG
+  age-credit total to approximate the combined employer + employee + risk +
+  admin contribution share. It is **not** a measured plan contribution rate
+  and will be replaced when a calibrated scenario layer is added.
+- `annual_asset_return = 0.0` — deterministic baseline assumption so that the
+  funding-ratio trajectory is driven purely by liability accumulation and net
+  cashflows. This is **not** a return forecast; positive return scenarios can
+  be passed explicitly via the `annual_asset_return` parameter.
+- `target_funding_ratio = 1.076` — calibrates opening assets via
+  `initial_assets = total_stage1_liability(0) * target_funding_ratio`.
+- `total_stage1_liability` excludes technical reserves and remains a Stage-1
+  proxy as documented in Step 4.
 
 ## Interpretation Warning
 

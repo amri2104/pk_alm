@@ -10,7 +10,7 @@ liquidity analytics, deterministic asset roll-forward, funding-ratio trajectory,
 funding-ratio summary analytics, scenario-level result summary reporting, and
 an end-to-end demo scenario with CSV export.
 
-The full test suite currently passes with **582 passed**.
+The full test suite currently passes with **584 passed**.
 
 ## Sprint Summary
 
@@ -31,6 +31,8 @@ The full test suite currently passes with **582 passed**.
 | Sprint 3A | Deterministic asset baseline and funding ratio | `src/pk_alm/assets/deterministic.py`, `src/pk_alm/analytics/funding.py`, `tests/test_assets_deterministic.py`, `tests/test_analytics_funding.py` | Calibrate initial assets from target funding ratio, roll assets forward using annual net cashflow and deterministic return, compute funding-ratio trajectory. | Initial asset calibration, one-year asset projection, asset trajectory, start_year/reporting_year alignment, funding-ratio validation, scenario integration. |
 | Sprint 3B | Funding-ratio summary analytics | `src/pk_alm/analytics/funding_summary.py`, `tests/test_analytics_funding_summary.py` | Summarize funding-ratio trajectories into a compact thesis-ready result table. | Initial/final/min/max funding ratios, underfunding counts, target comparison, tie handling, validation, scenario integration. |
 | Sprint 3C | Scenario result summary table | `src/pk_alm/scenarios/result_summary.py`, `tests/test_scenario_result_summary.py` | Build one-row scenario summary for thesis-ready baseline result reporting. | Standard scenario summary, horizon zero, invalid inputs, optional inflection fields, DataFrame conversion, export integration. |
+| Sprint 3D | Stage-1 outputs and reproducibility documentation | `docs/stage1_outputs.md`, `docs/stage1_pipeline.md`, `README.md`, `tests/test_documentation_status.py` | Document all seven CSV outputs, reproduction command, interpretation warnings, and limitations. | Documentation-status tests and full pytest suite. |
+| Sprint 3E | Pre-ACTUS cleanup | `src/pk_alm/analytics/funding_summary.py`, `src/pk_alm/scenarios/result_summary.py`, `examples/stage1_baseline.py`, `tests/test_stage1_baseline_scenario.py`, `docs/*` | Rename the funding-summary min/max year fields to the explicit `minimum_funding_ratio_projection_year` / `maximum_funding_ratio_projection_year` form; add CSV-roundtrip validation in the scenario export test; document `contribution_multiplier`, `annual_asset_return`, and Stage-1 liability proxy defaults. No model formulas changed. | Renamed-field tests, CSV-roundtrip validation in `test_run_with_export`, documentation-status tests. |
 
 ## Current Architecture
 
@@ -90,7 +92,7 @@ Generated CSV files (relative to the working directory):
 python -m pytest -v
 ```
 
-Current expected result: **582 passed**.
+Current expected result: **584 passed**.
 
 The tests are part of the verification strategy for the bachelor thesis. They
 serve as executable documentation: every financial formula has at least one
@@ -117,6 +119,26 @@ The current implementation is intentionally narrow:
   provisions / technical reserves (longevity, risk, fluctuation, additional
   reserves for pension losses).
 - Asset-side modelling is limited to a deterministic aggregate baseline.
+
+## Baseline Default Assumptions
+
+The `run_stage1_baseline` defaults are deliberately conservative and
+transparent rather than calibrated:
+
+- `contribution_multiplier = 1.4` is a simplified contribution inflow
+  multiplier applied to the BVG age-credit total. It stands in for the combined
+  employer + employee + risk + admin contribution share until a calibrated
+  scenario layer is added; it is **not** a measured plan contribution rate.
+- `annual_asset_return = 0.0` is a deterministic baseline assumption used to
+  isolate the liability-driven funding-ratio trajectory. It is **not** a return
+  forecast; positive return scenarios can be passed explicitly.
+- `target_funding_ratio = 1.076` calibrates opening assets via
+  `initial_assets = total_stage1_liability(0) * target_funding_ratio`.
+- `minimum_funding_ratio_projection_year` and
+  `maximum_funding_ratio_projection_year` in `funding_summary.csv` and
+  `scenario_summary.csv` are reported as **projection years** (0..N), not
+  calendar years. Calendar years for cashflow reporting use `start_year` and
+  `end_year` instead.
 
 ## Next Planned Step
 

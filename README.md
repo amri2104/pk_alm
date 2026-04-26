@@ -16,7 +16,7 @@ transparent liability proxy with deterministic funding-ratio reporting.
   reporting.
 - An end-to-end scenario is available as both a library function and a
   manual-run script.
-- Current tests: **582 passed**.
+- Current tests: **584 passed**.
 
 ## Quick Run
 

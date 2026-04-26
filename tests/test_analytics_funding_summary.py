@@ -39,9 +39,9 @@ def _standard_summary(**overrides):
         initial_funding_ratio_percent=107.6,
         final_funding_ratio_percent=101.0,
         minimum_funding_ratio_percent=95.0,
-        minimum_funding_ratio_year=2,
+        minimum_funding_ratio_projection_year=2,
         maximum_funding_ratio_percent=107.6,
-        maximum_funding_ratio_year=0,
+        maximum_funding_ratio_projection_year=0,
         target_funding_ratio_percent=107.6,
         years_below_100_percent=2,
         years_below_target_percent=3,
@@ -69,9 +69,9 @@ def test_standard_summary_values():
     assert summary.initial_funding_ratio_percent == pytest.approx(107.6)
     assert summary.final_funding_ratio_percent == pytest.approx(101.0)
     assert summary.minimum_funding_ratio_percent == pytest.approx(95.0)
-    assert summary.minimum_funding_ratio_year == 2
+    assert summary.minimum_funding_ratio_projection_year == 2
     assert summary.maximum_funding_ratio_percent == pytest.approx(107.6)
-    assert summary.maximum_funding_ratio_year == 0
+    assert summary.maximum_funding_ratio_projection_year == 0
     assert summary.target_funding_ratio_percent == pytest.approx(107.6)
     assert summary.years_below_100_percent == 2
     assert summary.years_below_target_percent == 3
@@ -92,9 +92,9 @@ def test_summary_ties_use_earliest_projection_year():
     )
 
     assert summary.minimum_funding_ratio_percent == pytest.approx(95.0)
-    assert summary.minimum_funding_ratio_year == 1
+    assert summary.minimum_funding_ratio_projection_year == 1
     assert summary.maximum_funding_ratio_percent == pytest.approx(110.0)
-    assert summary.maximum_funding_ratio_year == 3
+    assert summary.maximum_funding_ratio_projection_year == 3
 
 
 # ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ def test_summary_allows_negative_funding_ratio_values():
     )
 
     assert summary.minimum_funding_ratio_percent == pytest.approx(-10.0)
-    assert summary.minimum_funding_ratio_year == 1
+    assert summary.minimum_funding_ratio_projection_year == 1
     assert summary.years_below_100_percent == 3
 
 
@@ -184,8 +184,8 @@ def test_funding_summary_to_dataframe_list_of_two():
             _standard_summary(
                 start_projection_year=1,
                 end_projection_year=4,
-                maximum_funding_ratio_year=1,
-                minimum_funding_ratio_year=3,
+                maximum_funding_ratio_projection_year=1,
+                minimum_funding_ratio_projection_year=3,
             ),
         ]
     )

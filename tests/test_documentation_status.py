@@ -33,7 +33,9 @@ def test_progress_doc_mentions_first_and_last_sprint_and_test_count():
     assert "Sprint 3A" in text
     assert "Sprint 3B" in text
     assert "Sprint 3C" in text
-    assert "582 passed" in text
+    assert "Sprint 3D" in text
+    assert "Sprint 3E" in text
+    assert "584 passed" in text
 
 
 def test_pipeline_doc_mentions_key_functions():
@@ -57,10 +59,39 @@ def test_pipeline_doc_mentions_key_functions():
         ]
     )
     assert "scenario_summary.csv" in combined
-    assert "582 passed" in combined
+    assert "584 passed" in combined
     for outdated in (
         "No funding ratio logic",
         "Asset-side modelling is not yet implemented",
         "No assets/funding ratio yet",
     ):
         assert outdated not in combined
+
+
+def test_docs_use_renamed_projection_year_fields():
+    combined = "\n".join(
+        [
+            PROGRESS_DOC.read_text(),
+            PIPELINE_DOC.read_text(),
+            OUTPUTS_DOC.read_text(),
+        ]
+    )
+    assert "minimum_funding_ratio_projection_year" in combined
+    assert "maximum_funding_ratio_projection_year" in combined
+
+
+def test_docs_do_not_use_old_ambiguous_year_field_names():
+    combined = "\n".join(
+        [
+            README.read_text(),
+            PROGRESS_DOC.read_text(),
+            PIPELINE_DOC.read_text(),
+            OUTPUTS_DOC.read_text(),
+        ]
+    )
+    # The old, ambiguous bare names must not appear in any doc. The renamed
+    # form `..._projection_year` is allowed; substring search is safe because
+    # "minimum_funding_ratio_year" is not a substring of
+    # "minimum_funding_ratio_projection_year".
+    assert "minimum_funding_ratio_year" not in combined
+    assert "maximum_funding_ratio_year" not in combined

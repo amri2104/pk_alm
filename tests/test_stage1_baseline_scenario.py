@@ -199,6 +199,16 @@ def test_run_with_export(tmp_path):
     assert list(re_funding_summary.columns) == list(FUNDING_SUMMARY_COLUMNS)
     assert list(re_scenario_summary.columns) == list(SCENARIO_RESULT_COLUMNS)
 
+    # CSV roundtrip: every exported file must re-validate after pd.read_csv,
+    # including bool columns (which pandas writes as the strings 'True'/'False').
+    assert validate_cashflow_dataframe(re_cashflows) is True
+    assert validate_valuation_dataframe(re_valuation) is True
+    assert validate_annual_cashflow_dataframe(re_annual) is True
+    assert validate_asset_dataframe(re_assets) is True
+    assert validate_funding_ratio_dataframe(re_funding) is True
+    assert validate_funding_summary_dataframe(re_funding_summary) is True
+    assert validate_scenario_result_dataframe(re_scenario_summary) is True
+
 
 # ---------------------------------------------------------------------------
 # F. Parameter pass-through smoke test
