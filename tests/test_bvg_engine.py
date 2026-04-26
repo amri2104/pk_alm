@@ -282,39 +282,44 @@ def test_result_validation_wrong_cashflows_type_raises():
 
 
 # ---------------------------------------------------------------------------
-# H. Retirement guard
+# H. Retirement transition is now wired into the engine
 # ---------------------------------------------------------------------------
 
 
-def test_retirement_guard_age_64_one_year_allowed():
-    a64 = ActiveCohort(
+def _act_64_for_engine() -> ActiveCohort:
+    return ActiveCohort(
         cohort_id="ACT_64",
         age=64,
         count=2,
         gross_salary_per_person=80000,
         capital_active_per_person=500000,
     )
-    portfolio = BVGPortfolioState(active_cohorts=(a64,))
+
+
+def test_age_64_one_year_transitions_at_year_end():
+    portfolio = BVGPortfolioState(active_cohorts=(_act_64_for_engine(),))
     result = run_bvg_engine(portfolio, 1, RATE, RATE)
-    assert result.final_state.active_cohorts[0].age == 65
+    final = result.final_state
+    # Cohort has retired; active list is empty
+    assert len(final.active_cohorts) == 0
+    assert len(final.retired_cohorts) == 1
+    rc = final.retired_cohorts[0]
+    assert rc.cohort_id == "RET_FROM_ACT_64"
+    assert rc.age == 65
 
 
-def test_retirement_guard_age_64_two_years_raises():
-    a64 = ActiveCohort(
-        cohort_id="ACT_64",
-        age=64,
-        count=2,
-        gross_salary_per_person=80000,
-        capital_active_per_person=500000,
-    )
-    portfolio = BVGPortfolioState(active_cohorts=(a64,))
-    with pytest.raises(ValueError, match="beyond age 65"):
-        run_bvg_engine(portfolio, 2, RATE, RATE)
+def test_age_64_two_years_no_longer_raises():
+    portfolio = BVGPortfolioState(active_cohorts=(_act_64_for_engine(),))
+    result = run_bvg_engine(portfolio, 2, RATE, RATE)
+    # By year 2 the cohort has aged one more year as a retiree
+    final = result.final_state
+    assert len(final.active_cohorts) == 0
+    assert len(final.retired_cohorts) == 1
+    assert final.retired_cohorts[0].age == 66
 
 
-def test_retirement_guard_empty_active_cohorts_no_raise():
+def test_long_horizon_with_only_retirees():
     portfolio = BVGPortfolioState(retired_cohorts=(_ret_70(),))
-    # Long horizon should still work because there are no active cohorts.
     result = run_bvg_engine(portfolio, 10, RATE, RATE)
     assert result.horizon_years == 10
 
@@ -408,3 +413,177 @@ def test_start_year_invalid_type_raises(bad):
 def test_start_year_too_low_raises():
     with pytest.raises(ValueError):
         run_bvg_engine(_standard_portfolio(), 1, RATE, RATE, start_year=1999)
+
+
+# ---------------------------------------------------------------------------
+# J. Engine-level retirement integration tests
+# ---------------------------------------------------------------------------
+
+
+def test_one_year_retirement_pr_and_ka_in_2026():
+    portfolio = BVGPortfolioState(active_cohorts=(_act_64_for_engine(),))
+    result = run_bvg_engine(portfolio, 1, RATE, RATE)
+    df = result.cashflows
+
+    # PR (regular contribution) row first, then KA row
+    assert list(df["type"]) == ["PR", "KA"]
+    assert (df["time"] == pd.Timestamp("2026-12-31")).all()
+
+    pr_row = df.iloc[0]
+    ka_row = df.iloc[1]
+    # PR = age credit total at age 64: 2 * 80000_coord(54275) * 0.18 = 19539
+    assert pr_row["payoff"] == pytest.approx(19539.0)
+    # KA total: -2 * 518569.5 * 0.35
+    assert ka_row["payoff"] == pytest.approx(-362998.65)
+
+
+def test_one_year_retirement_creates_retired_cohort_with_correct_values():
+    portfolio = BVGPortfolioState(active_cohorts=(_act_64_for_engine(),))
+    result = run_bvg_engine(portfolio, 1, RATE, RATE)
+
+    rc = result.final_state.retired_cohorts[0]
+    assert rc.cohort_id == "RET_FROM_ACT_64"
+    assert rc.count == 2
+    assert rc.annual_pension_per_person == pytest.approx(22920.7719)
+    assert rc.capital_rente_per_person == pytest.approx(337070.175)
+
+
+def test_two_year_retirement_emits_rp_in_year_two():
+    portfolio = BVGPortfolioState(active_cohorts=(_act_64_for_engine(),))
+    result = run_bvg_engine(portfolio, 2, RATE, RATE)
+    df = result.cashflows
+
+    # Year 1 (2026): PR for ACT_64, KA for ACT_64
+    # Year 2 (2027): RP for RET_FROM_ACT_64
+    times_2026 = df[df["time"] == pd.Timestamp("2026-12-31")]
+    times_2027 = df[df["time"] == pd.Timestamp("2027-12-31")]
+
+    assert list(times_2026["type"]) == ["PR", "KA"]
+    assert list(times_2027["type"]) == ["RP"]
+
+    # No PR for ACT_64 in 2027
+    assert "PR" not in times_2027["type"].tolist()
+    # RP comes from the new retired cohort
+    assert times_2027.iloc[0]["contractId"] == "RET_FROM_ACT_64"
+    # RP = -annual_pension_total = -2 * 22920.7719 = -45841.5438
+    assert times_2027.iloc[0]["payoff"] == pytest.approx(-45841.5438)
+    assert validate_cashflow_dataframe(df) is True
+
+
+def test_contribution_multiplier_only_scales_active_pr_with_retirement():
+    portfolio = BVGPortfolioState(active_cohorts=(_act_64_for_engine(),))
+    result = run_bvg_engine(
+        portfolio, 1, RATE, RATE, contribution_multiplier=1.4
+    )
+    df = result.cashflows
+    pr_row = df[df["type"] == "PR"].iloc[0]
+    ka_row = df[df["type"] == "KA"].iloc[0]
+    assert pr_row["payoff"] == pytest.approx(19539.0 * 1.4)
+    # KA is unaffected by contribution_multiplier
+    assert ka_row["payoff"] == pytest.approx(-362998.65)
+
+
+def test_no_ka_when_active_stays_below_retirement_age():
+    portfolio = _standard_portfolio()  # ages 40 + 55, neither hits 65 in 2 years
+    result = run_bvg_engine(portfolio, 2, RATE, RATE)
+    assert "KA" not in set(result.cashflows["type"])
+    assert tuple(c.cohort_id for c in result.final_state.active_cohorts) == (
+        "ACT_40",
+        "ACT_55",
+    )
+
+
+def test_existing_retiree_continues_alongside_new_retirement():
+    a64 = _act_64_for_engine()
+    existing_retired = RetiredCohort(
+        cohort_id="RET_70",
+        age=70,
+        count=5,
+        annual_pension_per_person=30000,
+        capital_rente_per_person=450000,
+    )
+    portfolio = BVGPortfolioState(
+        active_cohorts=(a64,),
+        retired_cohorts=(existing_retired,),
+    )
+    result = run_bvg_engine(portfolio, 2, RATE, RATE)
+    df = result.cashflows
+
+    # 2026: existing retiree pays RP, ACT_64 pays PR + KA → 3 rows
+    rows_2026 = df[df["time"] == pd.Timestamp("2026-12-31")]
+    assert sorted(rows_2026["type"].tolist()) == ["KA", "PR", "RP"]
+    # The 2026 RP is the existing retiree, not a new one
+    rp_2026 = rows_2026[rows_2026["type"] == "RP"].iloc[0]
+    assert rp_2026["contractId"] == "RET_70"
+
+    # 2027: existing retiree + newly retired cohort both pay RP → 2 RP rows
+    rows_2027 = df[df["time"] == pd.Timestamp("2027-12-31")]
+    rp_2027 = rows_2027[rows_2027["type"] == "RP"]
+    assert set(rp_2027["contractId"]) == {"RET_70", "RET_FROM_ACT_64"}
+
+
+# ---------------------------------------------------------------------------
+# K. Invalid new engine parameters
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("bad", [True, 65.0, "65"])
+def test_retirement_age_invalid_type_raises(bad):
+    with pytest.raises(TypeError):
+        run_bvg_engine(_standard_portfolio(), 1, RATE, RATE, retirement_age=bad)
+
+
+def test_retirement_age_negative_raises():
+    with pytest.raises(ValueError):
+        run_bvg_engine(_standard_portfolio(), 1, RATE, RATE, retirement_age=-1)
+
+
+@pytest.mark.parametrize("bad", [True, "x"])
+def test_capital_withdrawal_fraction_invalid_type_raises(bad):
+    with pytest.raises(TypeError):
+        run_bvg_engine(
+            _standard_portfolio(),
+            1,
+            RATE,
+            RATE,
+            capital_withdrawal_fraction=bad,
+        )
+
+
+@pytest.mark.parametrize("bad", [-0.01, 1.01])
+def test_capital_withdrawal_fraction_invalid_value_raises(bad):
+    with pytest.raises(ValueError):
+        run_bvg_engine(
+            _standard_portfolio(),
+            1,
+            RATE,
+            RATE,
+            capital_withdrawal_fraction=bad,
+        )
+
+
+def test_capital_withdrawal_fraction_nan_raises():
+    with pytest.raises(ValueError):
+        run_bvg_engine(
+            _standard_portfolio(),
+            1,
+            RATE,
+            RATE,
+            capital_withdrawal_fraction=math.nan,
+        )
+
+
+@pytest.mark.parametrize("bad", [True, "x"])
+def test_conversion_rate_invalid_type_raises(bad):
+    with pytest.raises(TypeError):
+        run_bvg_engine(_standard_portfolio(), 1, RATE, RATE, conversion_rate=bad)
+
+
+def test_conversion_rate_negative_raises():
+    with pytest.raises(ValueError):
+        run_bvg_engine(_standard_portfolio(), 1, RATE, RATE, conversion_rate=-0.01)
+
+
+def test_conversion_rate_nan_raises():
+    with pytest.raises(ValueError):
+        run_bvg_engine(_standard_portfolio(), 1, RATE, RATE, conversion_rate=math.nan)

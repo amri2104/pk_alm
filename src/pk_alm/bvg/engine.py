@@ -9,7 +9,14 @@ import pandas as pd
 from pk_alm.bvg.cashflow_generation import generate_bvg_cashflow_dataframe_for_state
 from pk_alm.bvg.portfolio import BVGPortfolioState
 from pk_alm.bvg.portfolio_projection import project_portfolio_one_year
-from pk_alm.cashflows.schema import CASHFLOW_COLUMNS, validate_cashflow_dataframe
+from pk_alm.bvg.retirement_transition import (
+    apply_retirement_transitions_to_portfolio,
+)
+from pk_alm.cashflows.schema import (
+    CASHFLOW_COLUMNS,
+    cashflow_records_to_dataframe,
+    validate_cashflow_dataframe,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -96,12 +103,23 @@ def run_bvg_engine(
     retired_interest_rate: float,
     contribution_multiplier: float = 1.0,
     start_year: int = 2026,
+    retirement_age: int = 65,
+    capital_withdrawal_fraction: float = 0.35,
+    conversion_rate: float = 0.068,
 ) -> BVGEngineResult:
     """Project a BVG portfolio for `horizon_years` and emit one combined cashflow DataFrame.
 
-    Timing convention: at each step, cashflows are generated from the *current* state
-    (event date Dec 31 of that year), then the portfolio is projected one year forward.
-    Therefore len(portfolio_states) == horizon_years + 1.
+    Per-step timing convention:
+      1. Generate regular PR/RP cashflows from the current state (event date Dec 31).
+      2. Project the portfolio one year forward (interest crediting + age + 1).
+      3. Apply retirement transitions: any active cohort that has reached
+         `retirement_age` is converted to a retired cohort and emits a KA
+         capital-withdrawal record at the same year-end event date.
+
+    Therefore len(portfolio_states) == horizon_years + 1, and a cohort that
+    starts a year at age 64 receives one final regular contribution flow,
+    is projected to age 65, then retires at year-end (KA), and only starts
+    paying RP from the following year.
     """
     if not isinstance(initial_state, BVGPortfolioState):
         raise TypeError(
@@ -140,16 +158,22 @@ def run_bvg_engine(
     if start_year < 2000:
         raise ValueError(f"start_year must be >= 2000, got {start_year}")
 
-    # Retirement transitions are not implemented in this sprint.
-    max_active_age = max(
-        (c.age for c in initial_state.active_cohorts), default=0
+    retirement_age = _validate_non_bool_int(retirement_age, "retirement_age")
+    if retirement_age < 0:
+        raise ValueError(f"retirement_age must be >= 0, got {retirement_age}")
+
+    capital_withdrawal_fraction = _validate_non_bool_real(
+        capital_withdrawal_fraction, "capital_withdrawal_fraction"
     )
-    if max_active_age + horizon_years > 65:
+    if capital_withdrawal_fraction < 0.0 or capital_withdrawal_fraction > 1.0:
         raise ValueError(
-            "This projection would move at least one active cohort beyond age 65. "
-            "Retirement transitions are not implemented in this engine sprint. "
-            "Reduce horizon_years or implement retirement transition logic first."
+            f"capital_withdrawal_fraction must be in [0.0, 1.0], "
+            f"got {capital_withdrawal_fraction}"
         )
+
+    conversion_rate = _validate_non_bool_real(conversion_rate, "conversion_rate")
+    if conversion_rate < 0:
+        raise ValueError(f"conversion_rate must be >= 0, got {conversion_rate}")
 
     states: list[BVGPortfolioState] = [initial_state]
     cashflow_frames: list[pd.DataFrame] = []
@@ -157,13 +181,35 @@ def run_bvg_engine(
 
     for step in range(horizon_years):
         event_date = pd.Timestamp(f"{start_year + step}-12-31")
-        df = generate_bvg_cashflow_dataframe_for_state(
+
+        # 1. Regular PR/RP cashflows from the current state.
+        regular_df = generate_bvg_cashflow_dataframe_for_state(
             current_state, event_date, contribution_multiplier
         )
-        cashflow_frames.append(df)
-        current_state = project_portfolio_one_year(
+
+        # 2. Project one year forward.
+        projected_state = project_portfolio_one_year(
             current_state, active_interest_rate, retired_interest_rate
         )
+
+        # 3. Apply retirement transitions to the projected state.
+        transition = apply_retirement_transitions_to_portfolio(
+            projected_state,
+            event_date,
+            retirement_age=retirement_age,
+            capital_withdrawal_fraction=capital_withdrawal_fraction,
+            conversion_rate=conversion_rate,
+        )
+        transition_df = cashflow_records_to_dataframe(
+            list(transition.cashflow_records)
+        )
+
+        # Combine for this year: regular rows first, KA rows after.
+        year_df = pd.concat([regular_df, transition_df], ignore_index=True)
+        validate_cashflow_dataframe(year_df)
+        cashflow_frames.append(year_df)
+
+        current_state = transition.portfolio_state
         states.append(current_state)
 
     if cashflow_frames:
