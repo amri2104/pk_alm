@@ -222,6 +222,23 @@ generation remains an explicit future opt-in.
 This boundary is not part of `run_stage1_baseline(...)` and does not change
 the seven default Stage-1 CSV outputs.
 
+### Pension Fund AAL Asset Demo
+
+Sprint 7A.2 adds `src/pk_alm/scenarios/aal_asset_demo.py` and
+`examples/pension_fund_aal_asset_demo.py` as a separate combined cashflow
+demonstration. The helper runs the deterministic Stage-1 BVG baseline in
+memory with `run_stage1_baseline(..., output_dir=None)`, obtains
+schema-valid `ACTUS` cashflows from the AAL Asset Boundary fallback, combines
+both DataFrames, and recomputes annual cashflow analytics plus structural and
+net liquidity inflection years on the shared schema.
+
+This demo shows the intended bridge between the custom BVG liability side and
+the AAL/ACTUS asset side, but it is deliberately outside the default
+`run_stage1_baseline(...)` pipeline. It does not write or modify the seven
+default Stage-1 CSV outputs, does not require AAL, does not call
+`PublicActusService`, and does not add production AAL service-backed
+cashflow generation.
+
 ## Step 6 — Asset Snapshots
 
 `build_deterministic_asset_trajectory` produces `asset_snapshots`. It
@@ -311,6 +328,12 @@ To run the demo and produce CSVs:
 
 ```bash
 python examples/stage1_baseline.py
+```
+
+To run the separate pension fund AAL asset demo without writing Stage-1 CSVs:
+
+```bash
+python examples/pension_fund_aal_asset_demo.py
 ```
 
 When running directly from the repository's `src/` layout without an editable

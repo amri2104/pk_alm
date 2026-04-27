@@ -38,9 +38,15 @@ transparent liability proxy with deterministic funding-ratio reporting.
   available; offline ACTUS fixture fallback delivers schema-valid cashflows
   without AAL. `PublicActusService` is not called; no production event
   generation is added to the default baseline.
-- An end-to-end scenario is available as both a library function and a
+- Separate pension fund AAL asset demo
+  (`src/pk_alm/scenarios/aal_asset_demo.py` and
+  `examples/pension_fund_aal_asset_demo.py`) implemented for combining
+  Stage-1 BVG liability cashflows with AAL Asset Boundary fallback cashflows.
+  It is separate from `run_stage1_baseline(...)`, uses `output_dir=None`, and
+  does not change the default Stage-1 CSV outputs.
+- The Stage-1 baseline scenario is available as both a library function and a
   manual-run script.
-- Current tests: **897 passed, 12 skipped**.
+- Current tests: **919 passed, 12 skipped**.
 
 ## Quick Run
 
@@ -54,6 +60,12 @@ Run the Stage-1 baseline demo:
 
 ```bash
 python examples/stage1_baseline.py
+```
+
+Run the separate pension fund AAL asset demo:
+
+```bash
+python examples/pension_fund_aal_asset_demo.py
 ```
 
 When working directly from the `src/` layout without an editable install, run:
@@ -140,6 +152,11 @@ The current implementation is the **deterministic Stage-1 baseline**:
   and delivers offline schema-valid ACTUS cashflows as a fallback. It is not
   wired into the default Stage-1 baseline and does not call
   `PublicActusService`.
+- A separate pension fund AAL asset demo can combine Stage-1 BVG liability
+  cashflows with AAL Asset Boundary fallback cashflows for annual liquidity
+  analytics. The demo is a shared-schema demonstration, not the default
+  Stage-1 baseline, and it calls `run_stage1_baseline(...)` only with
+  `output_dir=None`.
 - Full ACTUS/AAL scenario integration is not implemented yet.
 - AAL remains optional and is not wired into the default Stage-1 baseline.
 - Real AAL cashflow generation is not implemented yet.
