@@ -44,9 +44,15 @@ transparent liability proxy with deterministic funding-ratio reporting.
   Stage-1 BVG liability cashflows with AAL Asset Boundary fallback cashflows.
   It is separate from `run_stage1_baseline(...)`, uses `output_dir=None`, and
   does not change the default Stage-1 CSV outputs.
+- Offline-safe multi-contract AAL/ACTUS asset portfolio layer
+  (`src/pk_alm/adapters/aal_asset_portfolio.py`) implemented: per-contract
+  specs map into dynamic AAL PAM terms and optional real AAL `Portfolio`
+  construction when AAL is available; reproducible cashflows still use the
+  ACTUS fixture/adapter fallback with `source="ACTUS"`. No service-backed
+  AAL event generation is added to the default path.
 - The Stage-1 baseline scenario is available as both a library function and a
   manual-run script.
-- Current tests: **919 passed, 12 skipped**.
+- Current tests: **968 passed, 14 skipped**.
 
 ## Quick Run
 
@@ -157,6 +163,13 @@ The current implementation is the **deterministic Stage-1 baseline**:
   analytics. The demo is a shared-schema demonstration, not the default
   Stage-1 baseline, and it calls `run_stage1_baseline(...)` only with
   `output_dir=None`.
+- `src/pk_alm/adapters/aal_asset_portfolio.py` provides an offline-safe
+  multi-contract AAL/ACTUS asset portfolio layer. It can construct multiple
+  real AAL `PAM` model objects and one real AAL `Portfolio` when AAL is
+  available, while reproducible cashflow output uses the existing ACTUS
+  fixture/adapter fallback. It is not wired into the default Stage-1 baseline,
+  does not call `PublicActusService`, and is not a calibrated real pension
+  fund asset allocation.
 - Full ACTUS/AAL scenario integration is not implemented yet.
 - AAL remains optional and is not wired into the default Stage-1 baseline.
 - Real AAL cashflow generation is not implemented yet.

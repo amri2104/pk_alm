@@ -239,6 +239,29 @@ default Stage-1 CSV outputs, does not require AAL, does not call
 `PublicActusService`, and does not add production AAL service-backed
 cashflow generation.
 
+### AAL/ACTUS Asset Portfolio v1
+
+Sprint 7A.3 adds `src/pk_alm/adapters/aal_asset_portfolio.py`, an
+offline-safe multi-contract asset portfolio layer. It represents each asset
+with a frozen contract spec and supports a small default portfolio of CHF
+fixed-rate PAM-like contracts with distinct contract IDs, maturities,
+notional amounts, and coupon rates. This is a manually inspectable modelling
+fixture, not a calibrated real pension fund asset allocation.
+
+When AAL is available, the portfolio layer can map each spec into the
+existing minimal AAL PAM term structure and construct multiple real AAL
+`PAM` objects plus one real AAL `Portfolio`. This is model construction only:
+`PublicActusService` is not called, no network endpoint is contacted, and
+production AAL service-backed event generation remains outside default
+execution.
+
+For reproducibility without AAL, the same specs are converted into
+schema-valid `ACTUS` cashflows through the existing fixed-rate fixture and
+`actus_adapter.py` path. The fallback DataFrame validates against the shared
+cashflow schema and keeps `source="ACTUS"` on every row, so it can be used by
+the existing cashflow analytics while remaining separate from
+`run_stage1_baseline(...)`.
+
 ## Step 6 — Asset Snapshots
 
 `build_deterministic_asset_trajectory` produces `asset_snapshots`. It
