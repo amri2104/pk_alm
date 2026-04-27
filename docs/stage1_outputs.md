@@ -22,11 +22,12 @@ python -m pytest -v
 Expected current test status:
 
 ```text
-809 passed, 8 skipped
+874 passed, 8 skipped
 ```
 
 Sprint 5C also recorded **761 passed** in the temporary
-`/tmp/pk_alm_aal_venv` environment with AAL `1.0.12` available.
+`/tmp/pk_alm_aal_venv` environment with AAL `1.0.12` available, and the
+pre-Sprint-6B/6C system result was **809 passed, 8 skipped**.
 
 Run the deterministic Stage-1 baseline example:
 
@@ -123,6 +124,11 @@ next to a calendar field.
   default baseline. Full ACTUS/AAL scenario integration remains deferred.
 - Sprint 6A time-grid utilities do not alter the seven default Stage-1
   outputs. The annual baseline remains the reference.
+- Sprint 6B (`monthly_cashflow_generation.py`) and Sprint 6C
+  (`monthly_reconciliation.py`) add no new output files. They cover only
+  monthly PR/RP timing and a monthly-vs-annual reconciliation; the seven
+  default Stage-1 CSV outputs are unchanged and the monthly utilities are
+  not wired into the default Stage-1 baseline.
 - No technical reserves yet.
 - `total_stage1_liability` is a deterministic Stage-1 proxy, not a full
   actuarial technical liability.

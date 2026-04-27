@@ -55,12 +55,36 @@ The first monthly utility deliberately stays small:
 These choices are intentionally simple and manually checkable. They do not
 yet represent a real pension fund payment calendar.
 
-## Future Sprints
+## Sprint 6B and Sprint 6C Status
 
-- **Sprint 6B:** add a monthly BVG PR/RP cashflow generator while leaving KA
-  retirement-transition timing explicit and tested.
-- **Sprint 6C:** add monthly analytics and annual aggregation comparison
-  against the reference annual baseline.
+- **Sprint 6B — implemented (PR/RP only).** A standalone monthly BVG PR/RP
+  cashflow generator is now available in
+  `src/pk_alm/bvg/monthly_cashflow_generation.py`. It uses
+  `build_time_grid(..., frequency="MONTHLY")` from this module to emit
+  schema-valid records with `source="BVG"` for each calendar month-end of a
+  reporting year.
+- **Sprint 6C — implemented (PR/RP only).** A standalone monthly-vs-annual
+  reconciliation utility is now available in
+  `src/pk_alm/analytics/monthly_reconciliation.py`. It validates that the
+  monthly PR/RP totals equal the annual BVG generator's totals up to a
+  small tolerance.
+
+## Current Monthly Scope
+
+The current monthly utilities are deliberately narrow:
+
+- PR contribution proxy and RP pension payment events only.
+- No KA capital-withdrawal monthly transition logic.
+- No monthly valuation, no monthly funding ratio, no monthly asset
+  roll-forward.
+- No multi-year monthly grid in the generator (one reporting year at a
+  time); the time-grid module itself can produce multi-year monthly grids
+  but no consumer uses that yet.
+- No calendar-aware payment days; month-end dates are used as a transparent
+  simplification.
+- Monthly PR/RP simulation is **not** wired into the default Stage-1
+  baseline. The annual baseline remains the reference and the seven default
+  Stage-1 CSV outputs are unchanged.
 
 ## Limitations
 

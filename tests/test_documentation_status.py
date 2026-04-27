@@ -43,6 +43,9 @@ def test_progress_doc_mentions_first_and_last_sprint_and_test_count():
     assert "Sprint 5A" in text
     assert "Sprint 5C" in text
     assert "Sprint 6A" in text
+    assert "Sprint 6B" in text
+    assert "Sprint 6C" in text
+    assert "874 passed, 8 skipped" in text
     assert "809 passed, 8 skipped" in text
     assert "753 passed, 8 skipped" in text
     assert "761 passed" in text
@@ -80,7 +83,14 @@ def test_pipeline_doc_mentions_key_functions():
     assert "time_grid.py" in combined
     assert "time_grid_feasibility.md" in combined
     assert "annual baseline remains the reference" in combined
-    assert "809 passed, 8 skipped" in combined
+    assert "874 passed, 8 skipped" in combined
+    assert "monthly_cashflow_generation.py" in combined
+    assert "monthly_reconciliation.py" in combined
+    assert "Sprint 6B" in combined
+    assert "Sprint 6C" in combined
+    assert "monthly PR/RP" in combined
+    assert "monthly-vs-annual" in combined
+    assert "not wired into the default Stage-1 baseline" in combined
     for outdated in (
         "No funding ratio logic",
         "Asset-side modelling is not yet implemented",
@@ -95,6 +105,9 @@ def test_pipeline_doc_mentions_key_functions():
         "monthly simulation is wired into the default baseline",
         "real AAL cashflows are wired into Stage-1",
         "default Stage-1 outputs changed",
+        "default baseline is monthly",
+        "monthly valuation exists",
+        "monthly asset roll-forward exists",
     ):
         assert outdated not in combined
 

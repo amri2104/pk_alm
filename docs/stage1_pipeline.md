@@ -177,6 +177,30 @@ into `run_stage1_baseline(...)`, and this utility does not change the BVG
 engine, valuation snapshots, deterministic asset roll-forward, funding-ratio
 analytics, scenario summaries, or default CSV exports.
 
+### Monthly PR/RP Cashflow Generation and Reconciliation
+
+Sprint 6B adds `src/pk_alm/bvg/monthly_cashflow_generation.py`, a standalone
+monthly BVG PR/RP cashflow generator that distributes per-cohort annual age
+credit totals (PR) and annual pension totals (RP) across calendar
+month-ends using `build_time_grid(..., frequency="MONTHLY")`. It emits
+records in the canonical 7-column cashflow schema with `source="BVG"`. KA
+capital-withdrawal events and retirement transitions are intentionally out
+of scope.
+
+Sprint 6C adds `src/pk_alm/analytics/monthly_reconciliation.py`, a
+standalone reconciliation utility that compares the monthly PR/RP totals to
+the annual BVG generator's PR/RP totals via a frozen
+`MonthlyReconciliationRow` dataclass and a validated
+monthly reconciliation DataFrame. KA and any other event types are silently
+ignored.
+
+Both Sprint 6B and Sprint 6C are separate from the annual Stage-1 pipeline.
+They are not wired into `run_stage1_baseline(...)`, do not modify the BVG
+engine, valuation snapshots, deterministic asset roll-forward, funding-ratio
+analytics, scenario summaries, or the seven default Stage-1 CSV outputs.
+Monthly PR/RP simulation remains standalone; the annual baseline is still
+the reference.
+
 ## Step 6 — Asset Snapshots
 
 `build_deterministic_asset_trajectory` produces `asset_snapshots`. It

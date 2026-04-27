@@ -25,9 +25,17 @@ transparent liability proxy with deterministic funding-ratio reporting.
   `1.0.12` can construct `PAM` and `Portfolio` objects when available.
 - Standalone annual/monthly time-grid feasibility utilities implemented for
   later monthly cashflow work.
+- Standalone monthly BVG PR/RP cashflow generator
+  (`src/pk_alm/bvg/monthly_cashflow_generation.py`) implemented on top of
+  the time-grid layer. PR/RP only; KA and retirement transitions are out of
+  scope. Not wired into the default Stage-1 baseline.
+- Standalone monthly-vs-annual BVG cashflow reconciliation utility
+  (`src/pk_alm/analytics/monthly_reconciliation.py`) implemented to prove
+  monthly PR/RP totals equal the annual generator's totals. Not wired into
+  the default Stage-1 baseline.
 - An end-to-end scenario is available as both a library function and a
   manual-run script.
-- Current tests: **809 passed, 8 skipped**.
+- Current tests: **874 passed, 8 skipped**.
 
 ## Quick Run
 
@@ -115,6 +123,13 @@ The current implementation is the **deterministic Stage-1 baseline**:
 - `src/pk_alm/time_grid.py` provides standalone annual/monthly feasibility
   utilities. The annual baseline remains the reference, and monthly simulation
   is not part of the default Stage-1 run.
+- `src/pk_alm/bvg/monthly_cashflow_generation.py` and
+  `src/pk_alm/analytics/monthly_reconciliation.py` provide a standalone
+  monthly BVG PR/RP cashflow generator and a monthly-vs-annual reconciliation
+  utility on top of the time-grid layer. They cover only PR and RP; they do
+  not implement KA / retirement-transition timing, monthly valuation, or
+  monthly asset roll-forward, and they are not wired into the default
+  Stage-1 baseline.
 - Full ACTUS/AAL scenario integration is not implemented yet.
 - AAL remains optional and is not wired into the default Stage-1 baseline.
 - Real AAL cashflow generation is not implemented yet.
