@@ -14,9 +14,11 @@ dictionaries into the shared cashflow schema, and Sprint 4B adds deterministic
 ACTUS-style fixed-rate bond fixtures as manually checkable adapter inputs.
 Sprint 4C adds a separate asset-cashflow overlay helper that combines BVG
 baseline cashflows with ACTUS-style fixed-rate bond fixture cashflows for
-annual liquidity analytics.
+annual liquidity analytics. Sprint 5A adds an optional AAL availability probe
+and import gateway for later real AAL integration without making AAL a hard
+dependency.
 
-The full test suite currently passes with **690 passed**.
+The full test suite currently passes with **718 passed, 2 skipped**.
 
 ## Sprint Summary
 
@@ -42,6 +44,7 @@ The full test suite currently passes with **690 passed**.
 | Sprint 4A | Minimal ACTUS/AAL adapter boundary | `src/pk_alm/adapters/actus_adapter.py`, `tests/test_actus_adapter.py` | Map simplified ACTUS/AAL-style event dictionaries into the canonical `CashflowRecord` schema with `source="ACTUS"`. | Standard event mapping, defaults, negative payoffs, multi-event order, DataFrame conversion, empty input, invalid input, no mutation, and BVG+ACTUS schema concatenation smoke test. |
 | Sprint 4B | ACTUS-style fixed-rate bond fixtures | `src/pk_alm/adapters/actus_fixtures.py`, `tests/test_actus_fixtures.py` | Create deterministic, manually checkable fixed-rate bond event dictionaries that flow through the Sprint 4A adapter into the canonical cashflow schema. | Standard bond events, purchase-event option, zero-coupon case, multi-year ordering, DataFrame helper, adapter integration, annual analytics integration, BVG+ACTUS combination smoke test, invalid inputs, deterministic output. |
 | Sprint 4C | Asset cashflow overlay scenario | `src/pk_alm/scenarios/asset_overlay.py`, `tests/test_asset_overlay_scenario.py` | Combine deterministic BVG baseline cashflows with ACTUS-style fixed-rate bond fixture cashflows in a separate overlay helper, then recompute annual cashflow analytics on the combined schema-valid cashflow set. | Overlay result validation, exact combined row count, ACTUS events in `other_cashflow`, purchase-event option, horizon-zero behavior, custom bond parameters, mixed-currency rejection, chronological sorting, invalid inputs, and default Stage-1 baseline unchanged. |
+| Sprint 5A | Optional AAL availability probe | `src/pk_alm/adapters/aal_probe.py`, `tests/test_aal_probe.py`, `tests/test_aal_optional_smoke.py` | Provide an optional import/version probe and controlled gateway for future real AAL integration without making AAL a hard dependency. | Availability dataclass validation, version metadata fallback, import success/failure, required-AAL error path, controlled module gateway, no top-level import, optional smoke tests skipped when AAL is absent. |
 
 ## Current Architecture
 
@@ -68,6 +71,9 @@ The codebase is organised into eight layers, each tested independently:
 9. **Overlay demonstration layer** — a separate asset-cashflow overlay helper
    that combines BVG baseline cashflows with ACTUS-style fixture cashflows for
    annual liquidity analytics without changing the default Stage-1 scenario.
+10. **Optional AAL probe layer** — an import/version probe and controlled
+    `get_aal_module()` gateway for later real AAL integration while keeping
+    the deterministic baseline usable without AAL.
 
 ## Current End-to-End Demo
 
@@ -107,7 +113,7 @@ Generated CSV files (relative to the working directory):
 python -m pytest -v
 ```
 
-Current expected result: **690 passed**.
+Current expected result: **718 passed, 2 skipped**.
 
 The tests are part of the verification strategy for the bachelor thesis. They
 serve as executable documentation: every financial formula has at least one
@@ -131,8 +137,9 @@ The current implementation is intentionally narrow:
   maps simplified ACTUS/AAL-style event dictionaries and deterministic
   fixed-rate bond fixtures into the shared schema. The Sprint 4C overlay
   combines BVG and fixture cashflows separately for annual analytics, but it
-  is not wired into the default Stage-1 baseline exports. The adapter and
-  overlay do not install, import, or call AAL.
+  is not wired into the default Stage-1 baseline exports. Sprint 5A can probe
+  optional AAL availability and version metadata, but it does not generate
+  real AAL cashflows or make AAL part of the default baseline.
 - No multi-asset allocation, rebalancing, or market-data ingestion.
 - `total_stage1_liability` is **not** a full actuarial technical liability. It
   is a deterministic Stage-1 proxy and intentionally excludes technical
@@ -163,6 +170,7 @@ transparent rather than calibrated:
 ## Next Planned Step
 
 The deterministic Stage-1 baseline should remain the reference baseline. The
-next sprint should build on the Sprint 4A/4B/4C adapter and overlay boundary
-only in a narrow, testable way; full ACTUS/AAL scenario wiring, stochastic
-rates, and calibrated asset-side modelling remain deferred.
+next sprint should build on the Sprint 4A/4B/4C/5A adapter, overlay, and
+optional AAL probe boundary only in a narrow, testable way; full ACTUS/AAL
+scenario wiring, stochastic rates, and calibrated asset-side modelling remain
+deferred.

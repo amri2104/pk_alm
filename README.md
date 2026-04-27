@@ -20,9 +20,10 @@ transparent liability proxy with deterministic funding-ratio reporting.
   manually checkable adapter inputs.
 - Separate asset-cashflow overlay helper implemented for combining BVG
   baseline cashflows with ACTUS-style fixture cashflows.
+- Optional AAL availability probe implemented for future real AAL integration.
 - An end-to-end scenario is available as both a library function and a
   manual-run script.
-- Current tests: **690 passed**.
+- Current tests: **718 passed, 2 skipped**.
 
 ## Quick Run
 
@@ -97,8 +98,11 @@ The current implementation is the **deterministic Stage-1 baseline**:
   with ACTUS-style fixture cashflows for annual liquidity analytics.
 - The overlay is a shared-schema demonstration, not the default Stage-1
   scenario, and the default Stage-1 CSV outputs remain unchanged.
+- An optional AAL availability probe can detect `awesome_actus_lib`, version
+  metadata, and expose `get_aal_module()` as a controlled future gateway.
 - Full ACTUS/AAL scenario integration is not implemented yet.
-- AAL is not installed, imported, or used by the Stage-1 baseline.
+- AAL remains optional and is not wired into the default Stage-1 baseline.
+- Real AAL cashflow generation is not implemented yet.
 - No stochastic interest-rate scenarios yet.
 - No mortality, new entrants, wage growth, inflation, survivor benefits, or
   disability benefits.

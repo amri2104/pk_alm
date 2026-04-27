@@ -111,6 +111,11 @@ analytics. This overlay demonstrates the shared cashflow schema, but it is
 not part of `run_stage1_baseline(...)` and does not change the default CSV
 exports.
 
+Sprint 5A adds `src/pk_alm/adapters/aal_probe.py`, an optional import/version
+probe and `get_aal_module()` gateway for later real AAL integration. The probe
+does not generate AAL cashflows and is not wired into the default Stage-1
+baseline.
+
 ## Step 4 — Valuation Snapshots
 
 `value_portfolio_states` builds one valuation row per portfolio state in the
