@@ -116,6 +116,14 @@ probe and `get_aal_module()` gateway for later real AAL integration. The probe
 does not generate AAL cashflows and is not wired into the default Stage-1
 baseline.
 
+Sprint 5B adds optional AAL API-surface introspection, and Sprint 5C records
+real-AAL smoke-test findings: AAL `1.0.12` can construct `PAM` and `Portfolio`
+objects in a temporary venv, and useful public symbols include `PAM`,
+`Portfolio`, `CashFlowStream`, `PublicActusService`, `IncomeAnalysis`,
+`LiquidityAnalysis`, and `ValueAnalysis`. `PublicActusService.generateEvents(...)`
+appears service-backed via `/eventsBatch`, so no production AAL event adapter
+or Stage-1 wiring has been added.
+
 ## Step 4 — Valuation Snapshots
 
 `value_portfolio_states` builds one valuation row per portfolio state in the
@@ -156,6 +164,18 @@ one row per reporting year:
 
 The validator `validate_annual_cashflow_dataframe` checks the schema,
 re-validates the two identities row by row, and rejects multiple currencies.
+
+### Time-Grid Feasibility
+
+Sprint 6A adds `src/pk_alm/time_grid.py`, a standalone annual/monthly
+time-grid helper for future monthly cashflow work. It can construct annual
+year-end grids, monthly calendar month-end grids, split annual amounts, and
+convert annual effective rates to periodic rates.
+
+The annual baseline remains the reference. Monthly simulation is not wired
+into `run_stage1_baseline(...)`, and this utility does not change the BVG
+engine, valuation snapshots, deterministic asset roll-forward, funding-ratio
+analytics, scenario summaries, or default CSV exports.
 
 ## Step 6 — Asset Snapshots
 

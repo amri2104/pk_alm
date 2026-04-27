@@ -16,9 +16,14 @@ Sprint 4C adds a separate asset-cashflow overlay helper that combines BVG
 baseline cashflows with ACTUS-style fixed-rate bond fixture cashflows for
 annual liquidity analytics. Sprint 5A adds an optional AAL availability probe
 and import gateway for later real AAL integration without making AAL a hard
-dependency.
+dependency. Sprint 5B adds optional AAL API-surface introspection, Sprint 5C
+documents real-AAL smoke-test findings, and Sprint 6A adds a standalone
+annual/monthly time-grid feasibility layer for future monthly cashflow work.
 
-The full test suite currently passes with **718 passed, 2 skipped**.
+The full system test suite currently passes with **809 passed, 8 skipped**.
+Sprint 5C recorded the pre-Sprint-6A system result **753 passed, 8 skipped**.
+With AAL `1.0.12` available in the temporary `/tmp/pk_alm_aal_venv`
+environment, the Sprint 5C AAL-focused suite observation was **761 passed**.
 
 ## Sprint Summary
 
@@ -45,10 +50,13 @@ The full test suite currently passes with **718 passed, 2 skipped**.
 | Sprint 4B | ACTUS-style fixed-rate bond fixtures | `src/pk_alm/adapters/actus_fixtures.py`, `tests/test_actus_fixtures.py` | Create deterministic, manually checkable fixed-rate bond event dictionaries that flow through the Sprint 4A adapter into the canonical cashflow schema. | Standard bond events, purchase-event option, zero-coupon case, multi-year ordering, DataFrame helper, adapter integration, annual analytics integration, BVG+ACTUS combination smoke test, invalid inputs, deterministic output. |
 | Sprint 4C | Asset cashflow overlay scenario | `src/pk_alm/scenarios/asset_overlay.py`, `tests/test_asset_overlay_scenario.py` | Combine deterministic BVG baseline cashflows with ACTUS-style fixed-rate bond fixture cashflows in a separate overlay helper, then recompute annual cashflow analytics on the combined schema-valid cashflow set. | Overlay result validation, exact combined row count, ACTUS events in `other_cashflow`, purchase-event option, horizon-zero behavior, custom bond parameters, mixed-currency rejection, chronological sorting, invalid inputs, and default Stage-1 baseline unchanged. |
 | Sprint 5A | Optional AAL availability probe | `src/pk_alm/adapters/aal_probe.py`, `tests/test_aal_probe.py`, `tests/test_aal_optional_smoke.py` | Provide an optional import/version probe and controlled gateway for future real AAL integration without making AAL a hard dependency. | Availability dataclass validation, version metadata fallback, import success/failure, required-AAL error path, controlled module gateway, no top-level import, optional smoke tests skipped when AAL is absent. |
+| Sprint 5B | Optional AAL API surface introspection | `src/pk_alm/adapters/aal_introspection.py`, `tests/test_aal_introspection.py`, `tests/test_aal_optional_api_surface.py` | Inspect the optional AAL API surface when available without creating contracts or generating cashflows. | Snapshot validation, public-name discovery, candidate-symbol filtering, report formatting, optional API-surface checks skipped when AAL is absent. |
+| Sprint 5C | Real AAL smoke-test findings | `tests/test_aal_real_contract_smoke.py`, `docs/implementation_progress.md` | Document that AAL `1.0.12` can construct real `PAM` and `Portfolio` objects in a temporary venv, while event generation appears service-backed through `PublicActusService.generateEvents(...)/eventsBatch`. | Optional real-AAL smoke tests skip without AAL and pass in the AAL venv; no production AAL event adapter, dependency, or Stage-1 wiring added. |
+| Sprint 6A | Time-grid and monthly-feasibility abstraction | `src/pk_alm/time_grid.py`, `tests/test_time_grid.py`, `docs/time_grid_feasibility.md` | Provide standalone annual/monthly time-grid helpers for future monthly cashflow simulation while keeping the annual baseline as the reference. | Frequency normalization, annual-to-periodic rate conversion, annual amount splitting, annual/monthly grid construction, leap-year month ends, DataFrame validation, and Stage-1 no-side-effect checks. |
 
 ## Current Architecture
 
-The codebase is organised into eight layers, each tested independently:
+The codebase is organised into twelve layers, each tested independently:
 
 1. **BVG domain layer** — formulas, cohorts, portfolio state, projections,
    retirement transitions.
@@ -74,6 +82,13 @@ The codebase is organised into eight layers, each tested independently:
 10. **Optional AAL probe layer** — an import/version probe and controlled
     `get_aal_module()` gateway for later real AAL integration while keeping
     the deterministic baseline usable without AAL.
+11. **Optional AAL introspection and smoke layer** — safe API-surface
+    discovery plus optional real-AAL `PAM` / `Portfolio` construction tests.
+    `PublicActusService` is visible, but event generation appears
+    service-backed and no production event adapter exists yet.
+12. **Time-grid feasibility layer** — standalone annual/monthly grid helpers
+    for later PR/RP monthly timing experiments. The annual baseline remains
+    the reference.
 
 ## Current End-to-End Demo
 
@@ -113,7 +128,10 @@ Generated CSV files (relative to the working directory):
 python -m pytest -v
 ```
 
-Current expected result: **718 passed, 2 skipped**.
+Current expected result: **809 passed, 8 skipped**.
+
+Sprint 5C also recorded an AAL-available temporary-venv result:
+**761 passed**.
 
 The tests are part of the verification strategy for the bachelor thesis. They
 serve as executable documentation: every financial formula has at least one
@@ -137,9 +155,15 @@ The current implementation is intentionally narrow:
   maps simplified ACTUS/AAL-style event dictionaries and deterministic
   fixed-rate bond fixtures into the shared schema. The Sprint 4C overlay
   combines BVG and fixture cashflows separately for annual analytics, but it
-  is not wired into the default Stage-1 baseline exports. Sprint 5A can probe
-  optional AAL availability and version metadata, but it does not generate
-  real AAL cashflows or make AAL part of the default baseline.
+  is not wired into the default Stage-1 baseline exports. Sprint 5A/5B can
+  probe optional AAL availability and API surface metadata, and Sprint 5C can
+  construct real AAL `PAM` and `Portfolio` objects when AAL is available, but
+  it does not generate real AAL cashflows or make AAL part of the default
+  baseline. `PublicActusService.generateEvents(...)` appears service-backed
+  through `/eventsBatch`.
+- No monthly BVG simulation yet. `src/pk_alm/time_grid.py` is a standalone
+  feasibility layer for future monthly PR/RP timing work; the annual baseline
+  remains the reference and the default outputs are unchanged.
 - No multi-asset allocation, rebalancing, or market-data ingestion.
 - `total_stage1_liability` is **not** a full actuarial technical liability. It
   is a deterministic Stage-1 proxy and intentionally excludes technical
@@ -169,8 +193,8 @@ transparent rather than calibrated:
 
 ## Next Planned Step
 
-The deterministic Stage-1 baseline should remain the reference baseline. The
-next sprint should build on the Sprint 4A/4B/4C/5A adapter, overlay, and
-optional AAL probe boundary only in a narrow, testable way; full ACTUS/AAL
-scenario wiring, stochastic rates, and calibrated asset-side modelling remain
-deferred.
+The deterministic annual Stage-1 baseline should remain the reference
+baseline. The next sprint can build a monthly BVG PR/RP cashflow generator on
+top of `time_grid.py`, or continue the AAL path only after deciding how to
+handle the service-backed event-generation boundary. Full ACTUS/AAL scenario
+wiring, stochastic rates, and calibrated asset-side modelling remain deferred.

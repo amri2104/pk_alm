@@ -21,9 +21,13 @@ transparent liability proxy with deterministic funding-ratio reporting.
 - Separate asset-cashflow overlay helper implemented for combining BVG
   baseline cashflows with ACTUS-style fixture cashflows.
 - Optional AAL availability probe implemented for future real AAL integration.
+- Optional AAL API introspection and real-AAL smoke tests document that AAL
+  `1.0.12` can construct `PAM` and `Portfolio` objects when available.
+- Standalone annual/monthly time-grid feasibility utilities implemented for
+  later monthly cashflow work.
 - An end-to-end scenario is available as both a library function and a
   manual-run script.
-- Current tests: **718 passed, 2 skipped**.
+- Current tests: **809 passed, 8 skipped**.
 
 ## Quick Run
 
@@ -79,6 +83,8 @@ Running the demo writes seven CSV files to
   of the end-to-end Stage-1 pipeline.
 - [docs/stage1_outputs.md](docs/stage1_outputs.md) — reproducibility guide
   for the generated Stage-1 output files.
+- [docs/time_grid_feasibility.md](docs/time_grid_feasibility.md) — feasibility
+  note for future monthly cashflow timing.
 - [docs/stage1_spec.md](docs/stage1_spec.md) — Stage-1 specification.
 - [docs/domain_notes.md](docs/domain_notes.md) — domain background.
 - [docs/decisions.md](docs/decisions.md) — architectural decision records.
@@ -100,6 +106,15 @@ The current implementation is the **deterministic Stage-1 baseline**:
   scenario, and the default Stage-1 CSV outputs remain unchanged.
 - An optional AAL availability probe can detect `awesome_actus_lib`, version
   metadata, and expose `get_aal_module()` as a controlled future gateway.
+- Optional AAL API introspection and `tests/test_aal_real_contract_smoke.py`
+  show that real AAL `PAM` and `Portfolio` objects can be constructed when AAL
+  is available. `PublicActusService.generateEvents(...)` appears
+  service-backed via `/eventsBatch`, so no production AAL event adapter has
+  been added. Sprint 5C recorded `753 passed, 8 skipped` in the system
+  environment and `761 passed` in the temporary AAL venv.
+- `src/pk_alm/time_grid.py` provides standalone annual/monthly feasibility
+  utilities. The annual baseline remains the reference, and monthly simulation
+  is not part of the default Stage-1 run.
 - Full ACTUS/AAL scenario integration is not implemented yet.
 - AAL remains optional and is not wired into the default Stage-1 baseline.
 - Real AAL cashflow generation is not implemented yet.
