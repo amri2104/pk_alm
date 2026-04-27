@@ -104,6 +104,13 @@ deterministic ACTUS-style fixed-rate bond events as test/example inputs for
 this adapter boundary. These fixtures are manually checkable data, not an
 ACTUS engine, and they are not wired into the Stage-1 scenario.
 
+Sprint 4C adds `src/pk_alm/scenarios/asset_overlay.py`, a separate helper
+that combines `run_stage1_baseline(...).engine_result.cashflows` with
+ACTUS-style fixed-rate bond fixture cashflows and recomputes annual cashflow
+analytics. This overlay demonstrates the shared cashflow schema, but it is
+not part of `run_stage1_baseline(...)` and does not change the default CSV
+exports.
+
 ## Step 4 — Valuation Snapshots
 
 `value_portfolio_states` builds one valuation row per portfolio state in the

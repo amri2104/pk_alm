@@ -18,9 +18,11 @@ transparent liability proxy with deterministic funding-ratio reporting.
   event dictionaries into the shared cashflow schema.
 - Deterministic ACTUS-style fixed-rate bond fixtures implemented as
   manually checkable adapter inputs.
+- Separate asset-cashflow overlay helper implemented for combining BVG
+  baseline cashflows with ACTUS-style fixture cashflows.
 - An end-to-end scenario is available as both a library function and a
   manual-run script.
-- Current tests: **663 passed**.
+- Current tests: **690 passed**.
 
 ## Quick Run
 
@@ -91,6 +93,10 @@ The current implementation is the **deterministic Stage-1 baseline**:
   cashflow conversion.
 - Deterministic ACTUS-style fixed-rate bond fixtures exist as manual
   test/example data for the adapter boundary; they are not an ACTUS engine.
+- A separate asset-cashflow overlay helper can combine BVG baseline cashflows
+  with ACTUS-style fixture cashflows for annual liquidity analytics.
+- The overlay is a shared-schema demonstration, not the default Stage-1
+  scenario, and the default Stage-1 CSV outputs remain unchanged.
 - Full ACTUS/AAL scenario integration is not implemented yet.
 - AAL is not installed, imported, or used by the Stage-1 baseline.
 - No stochastic interest-rate scenarios yet.

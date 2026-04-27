@@ -37,7 +37,8 @@ def test_progress_doc_mentions_first_and_last_sprint_and_test_count():
     assert "Sprint 3E" in text
     assert "Sprint 4A" in text
     assert "Sprint 4B" in text
-    assert "663 passed" in text
+    assert "Sprint 4C" in text
+    assert "690 passed" in text
 
 
 def test_pipeline_doc_mentions_key_functions():
@@ -63,12 +64,14 @@ def test_pipeline_doc_mentions_key_functions():
     assert "scenario_summary.csv" in combined
     assert "actus_adapter.py" in combined
     assert "actus_fixtures.py" in combined
-    assert "663 passed" in combined
+    assert "asset_overlay.py" in combined
+    assert "690 passed" in combined
     for outdated in (
         "No funding ratio logic",
         "Asset-side modelling is not yet implemented",
         "No assets/funding ratio yet",
         "full ACTUS integration exists",
+        "ACTUS/AAL is wired into the default Stage-1 baseline",
         "AAL is installed",
         "AAL is used in the Stage-1 baseline",
     ):

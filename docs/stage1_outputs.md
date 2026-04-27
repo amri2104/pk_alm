@@ -22,7 +22,7 @@ python -m pytest -v
 Expected current test status:
 
 ```text
-663 passed
+690 passed
 ```
 
 Run the deterministic Stage-1 baseline example:
@@ -107,7 +107,9 @@ next to a calendar field.
 - A minimal ACTUS/AAL-style adapter boundary exists, but it is not wired into
   this output run and does not add scenario output files. Deterministic
   ACTUS-style fixed-rate bond fixtures exist as test/example adapter inputs,
-  not as scenario exports. Full ACTUS/AAL scenario integration remains
+  not as scenario exports. A separate asset-cashflow overlay helper exists
+  for annual liquidity analytics, but overlay results are not part of these
+  seven default CSV outputs. Full ACTUS/AAL scenario integration remains
   deferred, and AAL is not installed or used.
 - No technical reserves yet.
 - `total_stage1_liability` is a deterministic Stage-1 proxy, not a full
