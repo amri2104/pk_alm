@@ -10,9 +10,10 @@ liquidity analytics, deterministic asset roll-forward, funding-ratio trajectory,
 funding-ratio summary analytics, scenario-level result summary reporting, and
 an end-to-end demo scenario with CSV export. Sprint 4A also adds a minimal
 ACTUS/AAL-style adapter boundary for converting simplified external event
-dictionaries into the shared cashflow schema.
+dictionaries into the shared cashflow schema, and Sprint 4B adds deterministic
+ACTUS-style fixed-rate bond fixtures as manually checkable adapter inputs.
 
-The full test suite currently passes with **620 passed**.
+The full test suite currently passes with **663 passed**.
 
 ## Sprint Summary
 
@@ -36,10 +37,11 @@ The full test suite currently passes with **620 passed**.
 | Sprint 3D | Stage-1 outputs and reproducibility documentation | `docs/stage1_outputs.md`, `docs/stage1_pipeline.md`, `README.md`, `tests/test_documentation_status.py` | Document all seven CSV outputs, reproduction command, interpretation warnings, and limitations. | Documentation-status tests and full pytest suite. |
 | Sprint 3E | Pre-ACTUS cleanup | `src/pk_alm/analytics/funding_summary.py`, `src/pk_alm/scenarios/result_summary.py`, `examples/stage1_baseline.py`, `tests/test_stage1_baseline_scenario.py`, `docs/*` | Rename the funding-summary min/max year fields to the explicit `minimum_funding_ratio_projection_year` / `maximum_funding_ratio_projection_year` form; add CSV-roundtrip validation in the scenario export test; document `contribution_multiplier`, `annual_asset_return`, and Stage-1 liability proxy defaults. No model formulas changed. | Renamed-field tests, CSV-roundtrip validation in `test_run_with_export`, documentation-status tests. |
 | Sprint 4A | Minimal ACTUS/AAL adapter boundary | `src/pk_alm/adapters/actus_adapter.py`, `tests/test_actus_adapter.py` | Map simplified ACTUS/AAL-style event dictionaries into the canonical `CashflowRecord` schema with `source="ACTUS"`. | Standard event mapping, defaults, negative payoffs, multi-event order, DataFrame conversion, empty input, invalid input, no mutation, and BVG+ACTUS schema concatenation smoke test. |
+| Sprint 4B | ACTUS-style fixed-rate bond fixtures | `src/pk_alm/adapters/actus_fixtures.py`, `tests/test_actus_fixtures.py` | Create deterministic, manually checkable fixed-rate bond event dictionaries that flow through the Sprint 4A adapter into the canonical cashflow schema. | Standard bond events, purchase-event option, zero-coupon case, multi-year ordering, DataFrame helper, adapter integration, annual analytics integration, BVG+ACTUS combination smoke test, invalid inputs, deterministic output. |
 
 ## Current Architecture
 
-The codebase is organised into seven layers, each tested independently:
+The codebase is organised into eight layers, each tested independently:
 
 1. **BVG domain layer** — formulas, cohorts, portfolio state, projections,
    retirement transitions.
@@ -57,7 +59,8 @@ The codebase is organised into seven layers, each tested independently:
 7. **Scenario layer** — a reproducible Stage-1 demo runner with scenario
    result summary and CSV export.
 8. **Adapter boundary layer** — a minimal ACTUS/AAL-style event dictionary
-   adapter that emits canonical cashflow records with `source="ACTUS"`.
+   adapter that emits canonical cashflow records with `source="ACTUS"`, plus
+   deterministic fixed-rate bond fixtures for tests and examples.
 
 ## Current End-to-End Demo
 
@@ -97,7 +100,7 @@ Generated CSV files (relative to the working directory):
 python -m pytest -v
 ```
 
-Current expected result: **620 passed**.
+Current expected result: **663 passed**.
 
 The tests are part of the verification strategy for the bachelor thesis. They
 serve as executable documentation: every financial formula has at least one
@@ -118,8 +121,9 @@ The current implementation is intentionally narrow:
 - No survivor benefits or disability benefits.
 - No stochastic interest-rate scenarios in this Stage-1 baseline.
 - No full ACTUS/AAL scenario integration. The current adapter boundary only
-  maps simplified ACTUS/AAL-style event dictionaries into the shared schema;
-  it does not install, import, or call AAL.
+  maps simplified ACTUS/AAL-style event dictionaries and deterministic
+  fixed-rate bond fixtures into the shared schema; it does not install,
+  import, or call AAL.
 - No multi-asset allocation, rebalancing, or market-data ingestion.
 - `total_stage1_liability` is **not** a full actuarial technical liability. It
   is a deterministic Stage-1 proxy and intentionally excludes technical
@@ -150,6 +154,6 @@ transparent rather than calibrated:
 ## Next Planned Step
 
 The deterministic Stage-1 baseline should remain the reference baseline. The
-next sprint should build on the Sprint 4A adapter boundary only in a narrow,
-testable way; full ACTUS/AAL scenario wiring, stochastic rates, and calibrated
-asset-side modelling remain deferred.
+next sprint should build on the Sprint 4A/4B adapter boundary only in a
+narrow, testable way; full ACTUS/AAL scenario wiring, stochastic rates, and
+calibrated asset-side modelling remain deferred.

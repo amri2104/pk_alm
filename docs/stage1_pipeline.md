@@ -99,6 +99,11 @@ The adapter is not wired into `run_stage1_baseline(...)`, does not change the
 seven Stage-1 CSV outputs, and does not install, import, or call AAL. The
 deterministic BVG baseline remains the reference Stage-1 scenario.
 
+Sprint 4B adds `src/pk_alm/adapters/actus_fixtures.py`, which provides
+deterministic ACTUS-style fixed-rate bond events as test/example inputs for
+this adapter boundary. These fixtures are manually checkable data, not an
+ACTUS engine, and they are not wired into the Stage-1 scenario.
+
 ## Step 4 — Valuation Snapshots
 
 `value_portfolio_states` builds one valuation row per portfolio state in the
@@ -230,6 +235,9 @@ To run the demo and produce CSVs:
 ```bash
 python examples/stage1_baseline.py
 ```
+
+When running directly from the repository's `src/` layout without an editable
+install, use `PYTHONPATH=src python3 examples/stage1_baseline.py`.
 
 CSV outputs are written to `outputs/stage1_baseline/` relative to the working
 directory and contain exactly the columns of the in-memory DataFrames,

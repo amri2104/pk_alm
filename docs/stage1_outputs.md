@@ -22,13 +22,19 @@ python -m pytest -v
 Expected current test status:
 
 ```text
-620 passed
+663 passed
 ```
 
 Run the deterministic Stage-1 baseline example:
 
 ```bash
 python examples/stage1_baseline.py
+```
+
+When running from the repository without an editable install, use:
+
+```bash
+PYTHONPATH=src python3 examples/stage1_baseline.py
 ```
 
 ## Output Directory
@@ -99,8 +105,10 @@ next to a calendar field.
 - No survivor or disability benefits.
 - No stochastic rates.
 - A minimal ACTUS/AAL-style adapter boundary exists, but it is not wired into
-  this output run and does not add scenario output files. Full ACTUS/AAL
-  scenario integration remains deferred, and AAL is not installed or used.
+  this output run and does not add scenario output files. Deterministic
+  ACTUS-style fixed-rate bond fixtures exist as test/example adapter inputs,
+  not as scenario exports. Full ACTUS/AAL scenario integration remains
+  deferred, and AAL is not installed or used.
 - No technical reserves yet.
 - `total_stage1_liability` is a deterministic Stage-1 proxy, not a full
   actuarial technical liability.

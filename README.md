@@ -16,9 +16,11 @@ transparent liability proxy with deterministic funding-ratio reporting.
   reporting.
 - Minimal ACTUS/AAL-style adapter boundary implemented for mapping simplified
   event dictionaries into the shared cashflow schema.
+- Deterministic ACTUS-style fixed-rate bond fixtures implemented as
+  manually checkable adapter inputs.
 - An end-to-end scenario is available as both a library function and a
   manual-run script.
-- Current tests: **620 passed**.
+- Current tests: **663 passed**.
 
 ## Quick Run
 
@@ -32,6 +34,19 @@ Run the Stage-1 baseline demo:
 
 ```bash
 python examples/stage1_baseline.py
+```
+
+When working directly from the `src/` layout without an editable install, run:
+
+```bash
+PYTHONPATH=src python3 examples/stage1_baseline.py
+```
+
+Alternatively, install the package locally first:
+
+```bash
+python3 -m pip install -e .
+python3 examples/stage1_baseline.py
 ```
 
 ## Generated Outputs
@@ -74,6 +89,8 @@ The current implementation is the **deterministic Stage-1 baseline**:
 - Scenario-level result summary export is included.
 - A minimal ACTUS/AAL-style adapter boundary exists for schema-compatible
   cashflow conversion.
+- Deterministic ACTUS-style fixed-rate bond fixtures exist as manual
+  test/example data for the adapter boundary; they are not an ACTUS engine.
 - Full ACTUS/AAL scenario integration is not implemented yet.
 - AAL is not installed, imported, or used by the Stage-1 baseline.
 - No stochastic interest-rate scenarios yet.
