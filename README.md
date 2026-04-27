@@ -33,9 +33,14 @@ transparent liability proxy with deterministic funding-ratio reporting.
   (`src/pk_alm/analytics/monthly_reconciliation.py`) implemented to prove
   monthly PR/RP totals equal the annual generator's totals. Not wired into
   the default Stage-1 baseline.
+- Optional AAL asset boundary (`src/pk_alm/adapters/aal_asset_boundary.py`)
+  implemented: constructs real AAL `PAM` and `Portfolio` objects when AAL is
+  available; offline ACTUS fixture fallback delivers schema-valid cashflows
+  without AAL. `PublicActusService` is not called; no production event
+  generation is added to the default baseline.
 - An end-to-end scenario is available as both a library function and a
   manual-run script.
-- Current tests: **874 passed, 8 skipped**.
+- Current tests: **897 passed, 12 skipped**.
 
 ## Quick Run
 
@@ -130,6 +135,11 @@ The current implementation is the **deterministic Stage-1 baseline**:
   not implement KA / retirement-transition timing, monthly valuation, or
   monthly asset roll-forward, and they are not wired into the default
   Stage-1 baseline.
+- An optional AAL asset boundary (`src/pk_alm/adapters/aal_asset_boundary.py`)
+  can construct real AAL `PAM` and `Portfolio` objects when AAL is available
+  and delivers offline schema-valid ACTUS cashflows as a fallback. It is not
+  wired into the default Stage-1 baseline and does not call
+  `PublicActusService`.
 - Full ACTUS/AAL scenario integration is not implemented yet.
 - AAL remains optional and is not wired into the default Stage-1 baseline.
 - Real AAL cashflow generation is not implemented yet.

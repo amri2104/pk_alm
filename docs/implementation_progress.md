@@ -26,8 +26,16 @@ totals. Both Sprint 6B and Sprint 6C are standalone and not wired into the
 default Stage-1 baseline; the seven default Stage-1 CSV outputs are
 unchanged.
 
-The full system test suite currently passes with **874 passed, 8 skipped**.
-The pre-Sprint-6A system result was **753 passed, 8 skipped** and the
+Sprint 7A.1 adds an optional AAL asset boundary
+(`src/pk_alm/adapters/aal_asset_boundary.py`) that can construct real AAL
+`PAM` and `Portfolio` objects when AAL is available, and provides an offline
+ACTUS fixture fallback that delivers schema-valid ACTUS cashflows without AAL
+or any network call. `PublicActusService` is not called; the default Stage-1
+baseline and seven CSV outputs are unchanged.
+
+The full system test suite currently passes with **897 passed, 12 skipped**.
+The pre-Sprint-7A.1 system result was **874 passed, 8 skipped**, the
+pre-Sprint-6A system result was **753 passed, 8 skipped**, and the
 pre-Sprint-6B/6C system result was **809 passed, 8 skipped**. With AAL
 `1.0.12` available in the temporary `/tmp/pk_alm_aal_venv` environment, the
 Sprint 5C AAL-focused suite observation was **761 passed**.
@@ -62,6 +70,7 @@ Sprint 5C AAL-focused suite observation was **761 passed**.
 | Sprint 6A | Time-grid and monthly-feasibility abstraction | `src/pk_alm/time_grid.py`, `tests/test_time_grid.py`, `docs/time_grid_feasibility.md` | Provide standalone annual/monthly time-grid helpers for future monthly cashflow simulation while keeping the annual baseline as the reference. | Frequency normalization, annual-to-periodic rate conversion, annual amount splitting, annual/monthly grid construction, leap-year month ends, DataFrame validation, and Stage-1 no-side-effect checks. |
 | Sprint 6B | Monthly BVG PR/RP cashflow generator | `src/pk_alm/bvg/monthly_cashflow_generation.py`, `tests/test_bvg_monthly_cashflow_generation.py` | Standalone generator that distributes BVG PR contribution proxies and RP pension payments across calendar month-ends using `build_time_grid(..., frequency="MONTHLY")` while emitting canonical-schema records. KA capital-withdrawal events and retirement transitions are intentionally out of scope; the generator is not wired into the default Stage-1 baseline. | Standard 36-record portfolio output, per-cohort monthly amount checks, monthly-vs-annual total parity, schema-valid DataFrame, empty portfolio, contribution multiplier semantics, invalid inputs, leap-year February month-end, immutability, and chronological per-month ordering. |
 | Sprint 6C | Monthly-vs-annual BVG cashflow reconciliation | `src/pk_alm/analytics/monthly_reconciliation.py`, `tests/test_monthly_reconciliation.py` | Standalone reconciliation utility that compares monthly PR/RP totals to the annual BVG generator using a frozen `MonthlyReconciliationRow` dataclass and a validated DataFrame in the canonical reconciliation schema. KA and other event types are silently ignored. The reconciliation does not touch the default Stage-1 baseline, valuation, asset roll-forward, funding-ratio analytics, or the seven default CSV outputs. | Standard reconciliation, convenience builder, tampered monthly cashflows, empty inputs producing zero PR/RP rows, KA ignored on either side, validator failure modes (non-DataFrame, missing/reordered columns, missing values, duplicate `(reporting_year, type)`, invalid event type, broken difference / abs_difference / is_close identities, bool reporting_year), and a Stage-1 no-side-effect check across `run_stage1_baseline(output_dir=None)`. |
+| Sprint 7A.1 | AAL asset boundary | `src/pk_alm/adapters/aal_asset_boundary.py`, `tests/test_aal_asset_boundary.py` | Optional real AAL PAM/Portfolio construction when AAL available; offline ACTUS fixture fallback without AAL; `AALAssetBoundaryProbeResult` frozen dataclass with `service_generation_attempted` hard-enforced False; no network calls; not wired into Stage-1 baseline. | Offline fallback schema validation, source="ACTUS" enforcement, dataclass invariants (bool type checks, impossible-state rejections), probe offline behaviour with monkeypatch, AAL-conditional construction tests (4 skipped when AAL absent), Stage-1 no-side-effect check. |
 
 ## Current Architecture
 
@@ -107,6 +116,12 @@ The codebase is organised into twelve layers, each tested independently:
     utility that proves monthly PR/RP totals equal the annual BVG generator's
     PR/RP totals up to a small tolerance. KA and other event types are
     ignored. The default Stage-1 baseline is not modified.
+15. **AAL asset boundary layer** — optional real AAL `PAM`/`Portfolio`
+    construction when AAL is available, plus an offline ACTUS fixture fallback
+    that delivers schema-valid ACTUS cashflows without AAL or any network call.
+    `service_generation_attempted` is hard-enforced False in the
+    `AALAssetBoundaryProbeResult` dataclass. The default Stage-1 baseline is
+    not modified.
 
 ## Current End-to-End Demo
 
@@ -146,11 +161,12 @@ Generated CSV files (relative to the working directory):
 python -m pytest -v
 ```
 
-Current expected result: **874 passed, 8 skipped**.
+Current expected result: **897 passed, 12 skipped**.
 
 Sprint 5C also recorded an AAL-available temporary-venv result:
 **761 passed**. The pre-Sprint-6B/6C system result was
-**809 passed, 8 skipped**.
+**809 passed, 8 skipped**. The pre-Sprint-7A.1 system result was
+**874 passed, 8 skipped**.
 
 The tests are part of the verification strategy for the bachelor thesis. They
 serve as executable documentation: every financial formula has at least one
@@ -218,12 +234,12 @@ transparent rather than calibrated:
 ## Next Planned Step
 
 The deterministic annual Stage-1 baseline should remain the reference
-baseline. With the standalone monthly PR/RP generator and monthly-vs-annual
-reconciliation now in place, candidate next sprints include monthly cashflow
-analytics with calendar-year aggregation back to the annual reference,
-multi-year monthly grids over the full projection horizon, or continuing the
-AAL path only after deciding how to handle the service-backed
-event-generation boundary. Monthly KA / retirement-transition timing,
-monthly valuation, monthly asset roll-forward, full ACTUS/AAL scenario
-wiring, stochastic rates, and calibrated asset-side modelling remain
-deferred.
+baseline. With Sprint 7A.1 completing the offline AAL asset boundary,
+candidate next sprints include: a service-backed event-generation path
+using `PublicActusService` as an explicit opt-in (requires a running ACTUS
+service endpoint), integrating real AAL cashflow output into the annual
+analytics overlay, monthly cashflow analytics with calendar-year aggregation
+back to the annual reference, or multi-year monthly grids. Monthly KA /
+retirement-transition timing, monthly valuation, monthly asset roll-forward,
+full ACTUS/AAL scenario wiring, stochastic rates, and calibrated asset-side
+modelling remain deferred.

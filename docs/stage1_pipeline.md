@@ -201,6 +201,27 @@ analytics, scenario summaries, or the seven default Stage-1 CSV outputs.
 Monthly PR/RP simulation remains standalone; the annual baseline is still
 the reference.
 
+### AAL Asset Boundary
+
+Sprint 7A.1 adds `src/pk_alm/adapters/aal_asset_boundary.py`, a separate
+optional asset-model boundary. It uses the existing `get_aal_module()`
+gateway from `aal_probe.py` to access AAL without a top-level import.
+
+When AAL is available, `build_aal_pam_contract(module)` and
+`build_aal_portfolio(module, contracts)` construct real `PAM` and `Portfolio`
+objects. When AAL is absent, `get_aal_asset_boundary_fallback_cashflows()`
+delivers schema-valid ACTUS cashflows using the deterministic bond fixtures
+from `actus_fixtures.py`.
+
+`probe_aal_asset_boundary()` reports which steps succeeded via the frozen
+`AALAssetBoundaryProbeResult` dataclass. The `service_generation_attempted`
+field is hard-enforced False by `__post_init__` — `PublicActusService` is
+never called and no network endpoint is contacted. Production event
+generation remains an explicit future opt-in.
+
+This boundary is not part of `run_stage1_baseline(...)` and does not change
+the seven default Stage-1 CSV outputs.
+
 ## Step 6 — Asset Snapshots
 
 `build_deterministic_asset_trajectory` produces `asset_snapshots`. It
