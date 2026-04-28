@@ -97,7 +97,7 @@ Do not add the following unless explicitly planned:
 Current full suite status:
 
 ```text
-1040 passed, 18 skipped
+1068 passed, 18 skipped
 ```
 
 Default test command:
