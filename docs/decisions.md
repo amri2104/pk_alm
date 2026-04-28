@@ -4,11 +4,11 @@
 
 **Status:** Accepted
 
-**Decision:** Stage 1 uses three engines: BVG Liability Engine, Asset / ACTUS Portfolio Engine, and ALM Analytics Engine.
+**Decision:** Stage 1 uses three engines: BVG Liability Engine, AAL Asset Engine, and ALM Analytics Engine, connected by the shared cashflow schema.
 
 **Rationale:** ACTUS is strong for standardized financial contract cashflows, especially asset-side instruments. Pension fund liabilities are governed by Swiss pension logic, cohort assumptions, contribution rules, conversion rates, and obligation valuation. These do not map cleanly to a single ACTUS contract type.
 
-**Consequence:** The system keeps ACTUS where it is strongest and uses purpose-built Python logic where pension fund semantics require it.
+**Consequence:** The system keeps ACTUS/AAL where it is strongest, on the asset side, and uses purpose-built Python logic where pension fund semantics require it. The protected deterministic Stage-1 baseline remains runnable without AAL; the integrated Full ALM scenario uses the AAL Asset Engine separately.
 
 ## ADR 002: Why Stage 1 Is Deterministic Before Stochastic Scenarios
 

@@ -97,3 +97,93 @@ def actus_events_to_cashflow_dataframe(events: list | tuple) -> pd.DataFrame:
     df = cashflow_records_to_dataframe(list(records))
     validate_cashflow_dataframe(df)
     return df
+
+
+# ---------------------------------------------------------------------------
+# AAL event normalization
+# ---------------------------------------------------------------------------
+
+_AAL_KEY_ALIASES: dict[str, tuple[str, ...]] = {
+    "contract_id": ("contract_id", "contractID", "contractId"),
+    "event_date": ("event_date", "eventDate", "time"),
+    "event_type": ("event_type", "eventType", "type"),
+    "payoff": ("payoff",),
+    "nominal_value": ("nominal_value", "nominalValue"),
+    "currency": ("currency",),
+}
+
+_AAL_REQUIRED_CANONICAL_KEYS = ("contract_id", "event_date", "event_type", "payoff")
+
+
+def _normalize_aal_event(
+    event: object,
+    *,
+    default_currency: str,
+) -> dict:
+    """Map an AAL-style event dict to the canonical adapter dict shape."""
+    if not isinstance(event, dict):
+        raise TypeError(
+            f"AAL event must be a dict, got {type(event).__name__}"
+        )
+
+    normalized: dict[str, object] = {}
+    for canonical, aliases in _AAL_KEY_ALIASES.items():
+        for alias in aliases:
+            if alias in event:
+                normalized[canonical] = event[alias]
+                break
+
+    missing = [k for k in _AAL_REQUIRED_CANONICAL_KEYS if k not in normalized]
+    if missing:
+        raise ValueError(f"missing required AAL event keys: {missing}")
+
+    normalized.setdefault("nominal_value", 0.0)
+    normalized.setdefault("currency", default_currency)
+    return normalized
+
+
+def aal_events_to_cashflow_dataframe(
+    events: object,
+    *,
+    default_currency: str = "CHF",
+) -> pd.DataFrame:
+    """Convert AAL-generated event output into a schema-valid cashflow DataFrame.
+
+    Accepts:
+      - a single ``dict``,
+      - a ``list`` or ``tuple`` of dicts,
+      - a ``pandas.DataFrame`` whose columns are AAL-style event keys,
+      - a wrapper object exposing an ``events_df`` ``DataFrame`` attribute.
+
+    The returned DataFrame always has ``source == "ACTUS"`` on every row
+    (the source value is set by the existing ACTUS adapter, not by AAL).
+    Unknown shapes raise ``TypeError``; missing required keys raise
+    ``ValueError``.
+    """
+    if not isinstance(default_currency, str) or not default_currency.strip():
+        raise ValueError("default_currency must be a non-empty string")
+
+    extracted: object = events
+    if (
+        not isinstance(extracted, (dict, list, tuple, pd.DataFrame))
+        and hasattr(extracted, "events_df")
+    ):
+        extracted = extracted.events_df
+
+    if isinstance(extracted, pd.DataFrame):
+        records = extracted.to_dict(orient="records")
+    elif isinstance(extracted, dict):
+        records = [extracted]
+    elif isinstance(extracted, (list, tuple)):
+        records = list(extracted)
+    else:
+        raise TypeError(
+            f"events must be dict, list, tuple, DataFrame, or an object with "
+            f"an 'events_df' DataFrame attribute, got {type(extracted).__name__}"
+        )
+
+    normalized = [
+        _normalize_aal_event(event, default_currency=default_currency)
+        for event in records
+    ]
+    return actus_events_to_cashflow_dataframe(normalized)

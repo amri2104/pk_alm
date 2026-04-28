@@ -15,6 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+aal = ["awesome-actus-lib>=1.0.12"]
 dev = [
     "pytest",
     "pytest-cov",

@@ -45,9 +45,9 @@ Stage 1 uses a three-engine architecture:
    - Models pension fund liabilities with purpose-built Python logic.
    - Produces liability cashflows and obligation snapshots.
 
-2. **Asset / ACTUS Portfolio Engine**
+2. **AAL Asset Engine**
    - Models asset-side cashflows.
-   - Uses ACTUS mainly for contractual asset cashflows, especially bonds.
+   - Uses AAL/ACTUS mainly for contractual asset cashflows, especially bonds.
    - Allows proxy models for equities and real estate with external value assumptions.
 
 3. **ALM Analytics Engine**
@@ -125,7 +125,7 @@ Expected Stage 1 modelling:
 
 Bond runoff is allowed in the baseline. Matured principal can be held as cash. Naive reinvestment can later be added as a sensitivity, but it is not part of the first baseline.
 
-Do not add AAL as a hard dependency in the initial setup. ACTUS/AAL integration should enter through a later adapter or local editable install.
+AAL must not be a hard dependency of the protected Stage-1 baseline. In the current implementation, the strategic asset-side path lives in the separate AAL Asset Engine: `generation_mode="aal"` is the main asset path, while `generation_mode="fallback"` is an explicit test/comparison/development path only. The optional install profile is `[aal]`.
 
 ## ALM Analytics Engine
 

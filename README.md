@@ -48,11 +48,23 @@ transparent liability proxy with deterministic funding-ratio reporting.
   (`src/pk_alm/adapters/aal_asset_portfolio.py`) implemented: per-contract
   specs map into dynamic AAL PAM terms and optional real AAL `Portfolio`
   construction when AAL is available; reproducible cashflows still use the
-  ACTUS fixture/adapter fallback with `source="ACTUS"`. No service-backed
-  AAL event generation is added to the default path.
+  ACTUS fixture/adapter fallback with `source="ACTUS"`. Service-backed AAL
+  event generation is handled by the separate AAL Asset Engine, not by this
+  portfolio-spec helper.
+- AAL Asset Engine v1 (`src/pk_alm/assets/aal_engine.py`) implemented. AAL
+  is the strategic asset engine; `generation_mode="aal"` is the main asset
+  path, while `generation_mode="fallback"` is an explicit
+  test/comparison/development path. There is no silent fallback.
+- Full ALM Scenario (`src/pk_alm/scenarios/full_alm_scenario.py`)
+  implemented: combines BVG liability cashflows with AAL asset-engine
+  cashflows through the shared `CashflowRecord` schema without mutating the
+  protected Stage-1 outputs.
+- ALM KPI / plot-ready output layer (`src/pk_alm/analytics/alm_kpis.py`)
+  implemented: KPI summary, cashflow-by-source table, and net-cashflow table.
+  No matplotlib, Streamlit, or in-app plotting layer has been added yet.
 - The Stage-1 baseline scenario is available as both a library function and a
   manual-run script.
-- Current tests: **968 passed, 14 skipped**.
+- Current tests: **1040 passed, 18 skipped**.
 
 ## Quick Run
 
@@ -73,6 +85,17 @@ Run the separate pension fund AAL asset demo:
 ```bash
 python examples/pension_fund_aal_asset_demo.py
 ```
+
+Run the integrated Full ALM scenario from Python by calling
+`run_full_alm_scenario(...)`. Its default asset path is
+`generation_mode="aal"` and requires the optional AAL install profile:
+
+```bash
+python3 -m pip install -e ".[aal]"
+```
+
+For offline development or comparison, pass `generation_mode="fallback"`
+explicitly. The fallback path is not the conceptual main asset path.
 
 When working directly from the `src/` layout without an editable install, run:
 
@@ -170,9 +193,20 @@ The current implementation is the **deterministic Stage-1 baseline**:
   fixture/adapter fallback. It is not wired into the default Stage-1 baseline,
   does not call `PublicActusService`, and is not a calibrated real pension
   fund asset allocation.
-- Full ACTUS/AAL scenario integration is not implemented yet.
-- AAL remains optional and is not wired into the default Stage-1 baseline.
-- Real AAL cashflow generation is not implemented yet.
+- `src/pk_alm/assets/aal_engine.py` is the strategic asset-side engine. Its
+  default `generation_mode="aal"` path uses AAL and raises clearly when AAL or
+  the service-backed event path is unavailable. The explicit
+  `generation_mode="fallback"` path is for tests, comparison, and offline
+  development only; it is never used silently.
+- `src/pk_alm/scenarios/full_alm_scenario.py` is the integrated BVG + AAL
+  scenario layer. It preserves the canonical `CashflowRecord` schema and does
+  not replace or mutate the protected `run_stage1_baseline(...)` outputs.
+- `src/pk_alm/analytics/alm_kpis.py` produces an ALM KPI summary plus
+  plot-ready DataFrames for cashflows by source and net cashflows. It does not
+  create actual matplotlib or Streamlit plots.
+- AAL remains optional for the package installation and is not a dependency of
+  the protected Stage-1 baseline. Install the optional profile with
+  `pip install -e ".[aal]"` when running the strategic AAL asset path locally.
 - No stochastic interest-rate scenarios yet.
 - No mortality, new entrants, wage growth, inflation, survivor benefits, or
   disability benefits.
