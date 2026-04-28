@@ -325,15 +325,21 @@ This layer introduces no new actuarial assumptions, market assumptions, or
 funding-ratio logic. It does not create actual matplotlib charts, Streamlit
 screens, or dashboard output.
 
-### Architecture Consolidation and Documentation
+### Repository Cleanup Analysis and Documentation
 
-Sprint 7G reviewed the architecture with documentation context and confirmed
-the current three-engine structure: BVG Liability Engine, AAL Asset Engine,
-and ALM Analytics Engine connected by the shared `CashflowRecord` bridge.
+Sprint 7G reviewed the architecture and repository hygiene before further
+feature work. It confirmed the current three-engine structure: BVG Liability
+Engine, AAL Asset Engine, and ALM Analytics Engine connected by the shared
+`CashflowRecord` bridge. It also classified older demo/intermediate modules
+as support/demo layers, not as deletion targets in the current sprint. The
+hygiene cleanup removed only generated Python caches and local `.DS_Store`
+files; it did not delete, rename, deprecate, or move modules.
 
-Sprint 7H consolidates documentation naming and current status around that
-architecture. Older demo/intermediate modules remain documented as support
-layers; they are not deleted, renamed, or deprecated in this sprint.
+Sprint 7I consolidates documentation naming and current status around that
+architecture, the repository hygiene result, and the protected distinction
+between the deterministic Stage-1 baseline and the separate Full ALM scenario.
+Older demo/intermediate modules remain documented as support layers; they are
+not deleted, renamed, or deprecated in this sprint.
 
 ## Step 6 — Asset Snapshots
 

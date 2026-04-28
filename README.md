@@ -62,6 +62,9 @@ transparent liability proxy with deterministic funding-ratio reporting.
 - ALM KPI / plot-ready output layer (`src/pk_alm/analytics/alm_kpis.py`)
   implemented: KPI summary, cashflow-by-source table, and net-cashflow table.
   No matplotlib, Streamlit, or in-app plotting layer has been added yet.
+- Repository hygiene cleanup performed: generated Python caches and local
+  `.DS_Store` files were removed without deleting, renaming, or deprecating
+  source modules, tests, examples, docs, or protected Stage-1 outputs.
 - The Stage-1 baseline scenario is available as both a library function and a
   manual-run script.
 - Current tests: **1040 passed, 18 skipped**.

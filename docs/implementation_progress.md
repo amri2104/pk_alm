@@ -73,14 +73,20 @@ cashflow-by-source plot table, and a net-cashflow plot table from existing
 Full ALM outputs. It does not add actual matplotlib, Streamlit, or dashboard
 plot rendering.
 
-Sprint 7G is the architecture consolidation review. It confirmed that the
-current code still follows the three-engine architecture: BVG Liability
-Engine, AAL Asset Engine, and ALM Analytics Engine connected by the shared
-`CashflowRecord` bridge.
+Sprint 7G is the repository cleanup analysis / hygiene sprint. It confirmed
+that the current code still follows the three-engine architecture: BVG
+Liability Engine, AAL Asset Engine, and ALM Analytics Engine connected by the
+shared `CashflowRecord` bridge. It also classified core modules,
+support/test infrastructure, demo/example modules, unsafe delete candidates,
+and safe generated-file cleanup. The hygiene cleanup removed generated
+Python caches and local `.DS_Store` files only; no source modules, tests,
+examples, docs, or protected Stage-1 outputs were deleted, renamed, or
+deprecated.
 
-Sprint 7H consolidates the documentation around that current architecture,
-the new sprint naming convention, and the protected distinction between the
-Stage-1 baseline and the integrated Full ALM scenario.
+Sprint 7I consolidates the documentation around that current architecture,
+the new sprint naming convention, repository hygiene, and the protected
+distinction between the Stage-1 baseline and the integrated Full ALM
+scenario.
 
 The full system test suite currently passes with **1040 passed, 18 skipped**.
 Historical reference points: the pre-Sprint 7D system result was
@@ -129,8 +135,8 @@ observation was **761 passed**.
 | Sprint 7D | AAL Asset Engine v1 | `src/pk_alm/assets/aal_engine.py`, `tests/test_assets_aal_engine.py` | Strategic asset-side engine. `generation_mode="aal"` is the main AAL path; `generation_mode="fallback"` is explicit only for tests/comparison/development; no silent fallback; AAL remains optional through the `[aal]` install profile. | Fallback mode, generation-mode validation, no-silent-fallback behaviour, AAL event mapping, result dataclass invariants, Stage-1 no-side-effect checks, optional real-AAL service-path tests. |
 | Sprint 7E | Full ALM Scenario | `src/pk_alm/scenarios/full_alm_scenario.py`, `tests/test_full_alm_scenario.py` | Combines BVG liability cashflows with AAL Asset Engine cashflows through the shared `CashflowRecord` schema and recomputes annual cashflow analytics without mutating protected Stage-1 outputs. | Combined row count, source preservation, canonical schema validation, deterministic sorting, generation-mode validation, no-silent-fallback behaviour, Stage-1 output protection, optional real-AAL path. |
 | Sprint 7F | ALM KPI / Plot-ready Outputs | `src/pk_alm/analytics/alm_kpis.py`, `tests/test_analytics_alm_kpis.py` | Builds a compact ALM KPI summary, cashflow-by-source plot table, and net-cashflow plot table from Full ALM outputs. No actual matplotlib or Streamlit plots. | KPI dataclass invariants, builder validation, funding-summary consistency, cashflow identity checks, stable output columns, no input mutation. |
-| Sprint 7G | Architecture Consolidation Review | Documentation-context review only | Reviewed docs and code architecture, classified core vs support/demo layers, identified documentation and test consolidation candidates. | Read-only review; no files changed. |
-| Sprint 7H | Documentation Consolidation | `README.md`, `docs/implementation_progress.md`, `docs/stage1_pipeline.md`, `docs/stage1_outputs.md` | Consolidates current sprint naming, current test status, AAL Asset Engine, Full ALM Scenario, KPI/plot-ready outputs, and the protected Stage-1 vs Full ALM distinction. | Documentation-only verification through documentation, Stage-1 baseline, Full ALM, KPI, and full-suite tests. |
+| Sprint 7G | Repository Cleanup Analysis / Hygiene | Read-only cleanup analysis; generated-file hygiene only | Reviewed docs and code architecture, classified core vs support/demo layers, identified unsafe delete candidates, and removed only generated Python caches / `.DS_Store` files. Source modules, tests, examples, docs, and protected Stage-1 outputs were not deleted, renamed, or deprecated. | Full suite stayed green at 1040 passed, 18 skipped after hygiene cleanup. |
+| Sprint 7I | Documentation Consolidation | `README.md`, `docs/implementation_progress.md`, `docs/stage1_pipeline.md`, `docs/stage1_outputs.md` | Consolidates current sprint naming, repository hygiene status, current test status, AAL Asset Engine, Full ALM Scenario, KPI/plot-ready outputs, and the protected Stage-1 vs Full ALM distinction. | Documentation-only verification through documentation, Stage-1 baseline, Full ALM, KPI, and full-suite tests. |
 
 ## Current Architecture
 
@@ -181,6 +187,11 @@ incremental build path and provide useful test fixtures:
   `src/pk_alm/analytics/monthly_reconciliation.py` are standalone monthly
   feasibility/support layers. They are not wired into the protected Stage-1
   baseline.
+
+Repository hygiene note: generated `__pycache__`, `.pyc`, and `.DS_Store`
+files are not part of the architecture and may be removed safely. This does
+not imply removal of any source, test, documentation, example, or protected
+output file.
 
 ## Current End-to-End Demo
 
@@ -300,7 +311,7 @@ transparent rather than calibrated:
 ## Next Planned Step
 
 The deterministic annual Stage-1 baseline should remain the protected
-reference baseline. After Sprint 7H, the natural next coding sprint is a
+reference baseline. After Sprint 7I, the natural next coding sprint is a
 narrow consolidation of integration ergonomics around the existing Full ALM
 Scenario: document or expose the canonical way to run `run_full_alm_scenario`
 with `generation_mode="aal"` when AAL and its service path are available, and
