@@ -68,7 +68,7 @@ transparent liability proxy with deterministic funding-ratio reporting.
   source modules, tests, examples, docs, or protected Stage-1 outputs.
 - The Stage-1 baseline scenario is available as both a library function and a
   manual-run script.
-- Current tests: **1058 passed, 18 skipped**.
+- Current tests: **1068 passed, 18 skipped**.
 
 ## Quick Run
 
@@ -88,6 +88,12 @@ Run the separate pension fund AAL asset demo:
 
 ```bash
 python examples/pension_fund_aal_asset_demo.py
+```
+
+Run the Full ALM reporting workflow with explicit offline fallback:
+
+```bash
+python examples/full_alm_reporting_workflow.py
 ```
 
 Run the integrated Full ALM scenario from Python by calling
@@ -137,16 +143,26 @@ Full ALM reporting exports are separate from the protected Stage-1 baseline.
 The reporting helpers in `src/pk_alm/reporting/` can write files such as:
 
 - `outputs/full_alm_scenario/full_alm_kpi_summary.csv`
+- `outputs/full_alm_scenario/full_alm_combined_cashflows.csv`
 - `outputs/full_alm_scenario/full_alm_annual_cashflows.csv`
 - `outputs/full_alm_scenario/full_alm_cashflow_by_source.csv`
 - `outputs/full_alm_scenario/full_alm_net_cashflow.csv`
-- `outputs/full_alm_scenario/full_alm_combined_cashflows.csv`
 - `outputs/full_alm_scenario/full_alm_funding_ratio_trajectory.csv`
 - `outputs/full_alm_scenario/benchmark_plausibility.csv`
 - `outputs/full_alm_scenario/plots/*.png`
 
 These outputs are reporting artifacts for the integrated Full ALM scenario.
 They do not replace or mutate `outputs/stage1_baseline/*`.
+
+The standard workflow also saves PNG plots:
+
+- `funding_ratio_trajectory.png` — funding-ratio percent by projection year.
+- `net_cashflow.png` — annual net and structural net cashflows.
+- `cashflow_by_source.png` — annual payoff totals split by `BVG` and `ACTUS`.
+- `assets_vs_liabilities.png` — assets and the Stage-1 liability proxy.
+
+`benchmark_plausibility.csv` is optional and is created only when the caller
+provides benchmark reference values or additional model values.
 
 ## Documentation
 
@@ -158,6 +174,8 @@ They do not replace or mutate `outputs/stage1_baseline/*`.
   for the generated Stage-1 output files.
 - [docs/time_grid_feasibility.md](docs/time_grid_feasibility.md) — feasibility
   note for future monthly cashflow timing.
+- [docs/user_workflow.md](docs/user_workflow.md) — short analyst workflow for
+  the Full ALM reporting outputs.
 - [docs/stage1_spec.md](docs/stage1_spec.md) — Stage-1 specification.
 - [docs/domain_notes.md](docs/domain_notes.md) — domain background.
 - [docs/decisions.md](docs/decisions.md) — architectural decision records.
