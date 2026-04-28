@@ -1,56 +1,124 @@
-# Agent Instructions
+# Agent Operating Guide
 
 This repository is the clean rebuild for the bachelor thesis:
 
 **Enhanced Portfolio Analytics for Pension Funds using ACTUS and Python**
 
-The repository implements **Stage 1 / Goal 1 only**: a deterministic economic ALM baseline for pension fund cashflows, liquidity risk, and funding-ratio analysis.
+The project is a cashflow-based ALM tool for Swiss pension funds. It combines
+purpose-built Python logic for BVG liabilities with ACTUS/AAL-based asset
+cashflows and analytics around liquidity, funding ratios, KPIs, and
+plot-ready outputs.
 
 ## Required Reading
 
-Before implementation work, agents must read:
+Before implementation work, read:
 
 - `docs/stage1_spec.md`
 - `docs/domain_notes.md`
 - `docs/decisions.md`
 
-These files define the project scope, domain assumptions, architectural decisions, and modelling boundaries.
+These files define the modelling scope, domain conventions, architectural
+decisions, and current Stage-1 boundaries.
+
+## Architecture
+
+The current architecture has three engines plus one shared integration
+contract:
+
+1. **BVG Liability Engine** — liability-side BVG cohorts, projections,
+   retirement transitions, cashflows, and valuation.
+2. **AAL Asset Engine** — strategic asset-side engine using AAL/ACTUS.
+3. **ALM Analytics Engine** — combines cashflows and builds liquidity,
+   funding-ratio, KPI, and plot-ready outputs.
+
+The shared `CashflowRecord` schema is the bridge between engines:
+
+```text
+contractId, time, type, payoff, nominalValue, currency, source
+```
+
+The `source` column is mandatory. Positive `payoff` means inflow to the
+pension fund; negative `payoff` means outflow.
+
+## AAL And Fallback Rules
+
+- AAL is the strategic asset engine for the asset side.
+- `generation_mode="aal"` is the main asset path.
+- `generation_mode="fallback"` is explicit only for tests, comparison, and
+  offline development.
+- Never silently fall back from AAL mode to fallback mode.
+- AAL is optional for package installation and must not become a dependency of
+  the protected Stage-1 baseline unless explicitly planned.
+
+## Protected Baseline
+
+The Stage-1 BVG baseline is the protected deterministic reference. Do not
+modify it accidentally, and do not claim that `full_alm_scenario.py` replaces
+`stage1_baseline.py`.
+
+Do not touch:
+
+```text
+outputs/stage1_baseline/*
+```
+
+`stage1_outputs.md` documents only the seven protected Stage-1 CSV outputs,
+not the Full ALM scenario.
 
 ## Scope Boundaries
 
-Do not implement the following unless a later task explicitly changes the scope:
+Do not add the following unless explicitly planned:
 
-- No Goal 2 going-concern strategy optimization yet.
-- No stochastic interest-rate scenarios yet.
-- No mortality tables.
-- No wage growth.
-- No inflation.
-- No dynamic rebalancing.
-- No early or deferred retirement.
-- No disability or survivor benefits.
+- Streamlit
+- stochastic scenarios or stochastic rates
+- mortality tables
+- wage growth
+- inflation
+- new entrants
+- dynamic rebalancing
+- early/deferred retirement
+- disability or survivor benefits
+- new financial assumptions hidden inside reporting layers
 
-Stage 1 is a deterministic baseline, not a full production pension fund model.
+## Current Sprint Naming
 
-## Engineering Rules
+- Sprint 7A — AAL Asset Boundary
+- Sprint 7B — Pension Fund AAL Asset Demo
+- Sprint 7C — AAL/ACTUS Asset Portfolio v1
+- Sprint 7D — AAL Asset Engine v1
+- Sprint 7E — Full ALM Scenario
+- Sprint 7F — ALM KPI / Plot-ready Outputs
+- Sprint 7G — Repository Cleanup Analysis / Hygiene
+- Sprint 7I — Documentation Consolidation
+- Sprint 7J — Agent Operating Guide
+
+## Testing
+
+Current full suite status:
+
+```text
+1040 passed, 18 skipped
+```
+
+Default test command:
+
+```bash
+python3 -m pytest
+```
+
+For focused work, run the relevant targeted tests first, then the full suite
+when feasible. Documentation-only changes should at least run:
+
+```bash
+python3 -m pytest tests/test_documentation_status.py
+```
+
+## Engineering Posture
 
 - Work in small increments.
-- Prefer pure functions before engines or orchestration classes.
-- Add tests for every financial formula.
-- Run `pytest` before summarizing implementation changes.
+- Prefer pure functions before orchestration classes.
 - Keep calculations transparent and manually checkable.
-- Avoid hidden assumptions in formulas; document calibration choices.
-- Do not add AAL or stochastic-rates as hard dependencies until an adapter task explicitly asks for it.
-
-## Domain Conventions
-
-- Positive `payoff` means cash inflow to the pension fund.
-- Negative `payoff` means cash outflow from the pension fund.
-- The `source` column is mandatory and must identify the origin of each event.
-- The shared cashflow schema is the integration contract between engines.
-- `V(t) = active savings capital + retiree PV + technical reserves`.
-- `Pensionierungsverlust` is a KPI / P&L effect.
-- Do not add `Pensionierungsverlust` separately to obligations if retiree PV already includes the full pension obligation.
-
-## Implementation Posture
-
-The first implementation should prioritize correctness and explainability over feature breadth. If a result cannot be manually checked with a small example, the model is not yet simple enough.
+- Add or preserve tests for financial formulas and schema contracts.
+- Treat older demo/intermediate modules as support/demo layers unless a task
+  explicitly asks to remove or consolidate them.
+- Do not delete, rename, or move modules during documentation/config tasks.
