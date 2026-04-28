@@ -61,13 +61,14 @@ transparent liability proxy with deterministic funding-ratio reporting.
   protected Stage-1 outputs.
 - ALM KPI / plot-ready output layer (`src/pk_alm/analytics/alm_kpis.py`)
   implemented: KPI summary, cashflow-by-source table, and net-cashflow table.
-  No matplotlib, Streamlit, or in-app plotting layer has been added yet.
+  Sprint 8 adds a separate reporting package for CSV export, matplotlib PNG
+  plots, and caller-supplied benchmark/plausibility tables.
 - Repository hygiene cleanup performed: generated Python caches and local
   `.DS_Store` files were removed without deleting, renaming, or deprecating
   source modules, tests, examples, docs, or protected Stage-1 outputs.
 - The Stage-1 baseline scenario is available as both a library function and a
   manual-run script.
-- Current tests: **1040 passed, 18 skipped**.
+- Current tests: **1058 passed, 18 skipped**.
 
 ## Quick Run
 
@@ -131,6 +132,21 @@ Running the demo writes seven CSV files to
   summary for thesis reporting.
 - `outputs/stage1_baseline/scenario_summary.csv` — one-row scenario result
   summary for baseline reporting.
+
+Full ALM reporting exports are separate from the protected Stage-1 baseline.
+The reporting helpers in `src/pk_alm/reporting/` can write files such as:
+
+- `outputs/full_alm_scenario/full_alm_kpi_summary.csv`
+- `outputs/full_alm_scenario/full_alm_annual_cashflows.csv`
+- `outputs/full_alm_scenario/full_alm_cashflow_by_source.csv`
+- `outputs/full_alm_scenario/full_alm_net_cashflow.csv`
+- `outputs/full_alm_scenario/full_alm_combined_cashflows.csv`
+- `outputs/full_alm_scenario/full_alm_funding_ratio_trajectory.csv`
+- `outputs/full_alm_scenario/benchmark_plausibility.csv`
+- `outputs/full_alm_scenario/plots/*.png`
+
+These outputs are reporting artifacts for the integrated Full ALM scenario.
+They do not replace or mutate `outputs/stage1_baseline/*`.
 
 ## Documentation
 
@@ -205,8 +221,10 @@ The current implementation is the **deterministic Stage-1 baseline**:
   scenario layer. It preserves the canonical `CashflowRecord` schema and does
   not replace or mutate the protected `run_stage1_baseline(...)` outputs.
 - `src/pk_alm/analytics/alm_kpis.py` produces an ALM KPI summary plus
-  plot-ready DataFrames for cashflows by source and net cashflows. It does not
-  create actual matplotlib or Streamlit plots.
+  plot-ready DataFrames for cashflows by source and net cashflows.
+- `src/pk_alm/reporting/` exports Full ALM scenario outputs, saves matplotlib
+  PNG plots, and prepares benchmark/plausibility tables from caller-provided
+  reference values. It does not add Streamlit or new economic assumptions.
 - AAL remains optional for the package installation and is not a dependency of
   the protected Stage-1 baseline. Install the optional profile with
   `pip install -e ".[aal]"` when running the strategic AAL asset path locally.

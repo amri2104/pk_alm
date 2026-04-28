@@ -322,8 +322,30 @@ ALM results. It produces:
   buckets.
 
 This layer introduces no new actuarial assumptions, market assumptions, or
-funding-ratio logic. It does not create actual matplotlib charts, Streamlit
-screens, or dashboard output.
+funding-ratio logic.
+
+### Thesis-ready Full ALM Reporting
+
+Sprint 8 adds `src/pk_alm/reporting/`, a separate reporting package above the
+Full ALM Scenario and ALM KPI layer. It keeps calculation separate from I/O:
+
+```text
+export_full_alm_result(already_computed_result, output_dir)
+    → write and read-validate Full ALM CSV outputs
+
+export_full_alm_results(output_dir, generation_mode="aal", ...)
+    → run_full_alm_scenario(...)
+        → export_full_alm_result(...)
+```
+
+Both export functions reject `outputs/stage1_baseline/` and child paths as
+targets. Neither function catches AAL errors or switches to fallback mode.
+Offline fallback remains explicit through `generation_mode="fallback"`.
+
+The reporting package can also save matplotlib PNG files from existing
+DataFrames and build benchmark/plausibility tables from caller-provided
+reference values. It does not add Streamlit, stochastic modelling, new
+financial assumptions, or empirical benchmark claims.
 
 ### Repository Cleanup Analysis and Documentation
 

@@ -88,8 +88,18 @@ the new sprint naming convention, repository hygiene, and the protected
 distinction between the Stage-1 baseline and the integrated Full ALM
 scenario.
 
-The full system test suite currently passes with **1040 passed, 18 skipped**.
-Historical reference points: the pre-Sprint 7D system result was
+Sprint 8 adds a thesis-ready reporting layer (`src/pk_alm/reporting/`) on top
+of the Full ALM Scenario and ALM KPI outputs. It separates calculation from
+I/O via `export_full_alm_result(...)` for already computed results and
+`export_full_alm_results(...)` as a convenience wrapper. It writes Full ALM
+CSV exports outside `outputs/stage1_baseline/`, saves matplotlib PNG plots,
+and prepares benchmark/plausibility tables from caller-provided reference
+values. It does not add Streamlit, stochastic modelling, or new financial
+assumptions.
+
+The full system test suite currently passes with **1058 passed, 18 skipped**.
+Historical reference points: the pre-Sprint 8 result was
+**1040 passed, 18 skipped**; the pre-Sprint 7D system result was
 **968 passed, 14 skipped**; the pre-Sprint 7C result was
 **919 passed, 12 skipped**; the pre-Sprint 7B result was
 **897 passed, 12 skipped**; the pre-Sprint 7A result was
@@ -137,6 +147,7 @@ observation was **761 passed**.
 | Sprint 7F | ALM KPI / Plot-ready Outputs | `src/pk_alm/analytics/alm_kpis.py`, `tests/test_analytics_alm_kpis.py` | Builds a compact ALM KPI summary, cashflow-by-source plot table, and net-cashflow plot table from Full ALM outputs. No actual matplotlib or Streamlit plots. | KPI dataclass invariants, builder validation, funding-summary consistency, cashflow identity checks, stable output columns, no input mutation. |
 | Sprint 7G | Repository Cleanup Analysis / Hygiene | Read-only cleanup analysis; generated-file hygiene only | Reviewed docs and code architecture, classified core vs support/demo layers, identified unsafe delete candidates, and removed only generated Python caches / `.DS_Store` files. Source modules, tests, examples, docs, and protected Stage-1 outputs were not deleted, renamed, or deprecated. | Full suite stayed green at 1040 passed, 18 skipped after hygiene cleanup. |
 | Sprint 7I | Documentation Consolidation | `README.md`, `docs/implementation_progress.md`, `docs/stage1_pipeline.md`, `docs/stage1_outputs.md` | Consolidates current sprint naming, repository hygiene status, current test status, AAL Asset Engine, Full ALM Scenario, KPI/plot-ready outputs, and the protected Stage-1 vs Full ALM distinction. | Documentation-only verification through documentation, Stage-1 baseline, Full ALM, KPI, and full-suite tests. |
+| Sprint 8 | Thesis-ready Reporting, Plots, and Benchmark Preparation | `src/pk_alm/reporting/`, `tests/test_reporting_full_alm_export.py`, `tests/test_reporting_plots.py`, `tests/test_reporting_benchmark.py` | Exports Full ALM results to separate CSV files, saves matplotlib PNG plots, and builds caller-reference benchmark/plausibility tables without touching protected Stage-1 outputs. | Export/readback checks, calculation-vs-I/O separation, protected-output rejection, no-silent-fallback checks, PNG creation, input non-mutation, benchmark column and difference checks. |
 
 ## Current Architecture
 
@@ -168,6 +179,10 @@ Scenario layers sit on top of these engines:
   scenario layer. It combines liability and asset-engine cashflows through
   the shared schema and recomputes annual analytics, but it does not replace
   or mutate `run_stage1_baseline(...)`.
+- `src/pk_alm/reporting/` is the reporting/export layer above Full ALM. It
+  writes thesis-ready CSV files, matplotlib PNG plots, and benchmark
+  plausibility tables into caller-provided directories outside the protected
+  Stage-1 output path.
 
 Support and demo layers remain in the repository because they document the
 incremental build path and provide useful test fixtures:
@@ -231,7 +246,7 @@ Generated CSV files (relative to the working directory):
 python -m pytest -v
 ```
 
-Current expected result: **1040 passed, 18 skipped**.
+Current expected result: **1058 passed, 18 skipped**.
 
 Sprint 5C also recorded an AAL-available temporary-venv result:
 **761 passed**. The pre-Sprint-6B/6C system result was
@@ -311,12 +326,10 @@ transparent rather than calibrated:
 ## Next Planned Step
 
 The deterministic annual Stage-1 baseline should remain the protected
-reference baseline. After Sprint 7I, the natural next coding sprint is a
-narrow consolidation of integration ergonomics around the existing Full ALM
-Scenario: document or expose the canonical way to run `run_full_alm_scenario`
-with `generation_mode="aal"` when AAL and its service path are available, and
-with explicit `generation_mode="fallback"` only for tests/comparison/offline
-development.
+reference baseline. After Sprint 8, the natural next coding step is thesis
+scenario interpretation on top of the exported reporting artifacts: define
+which explicit, caller-provided reference values belong in the benchmark
+table and which generated PNGs are used in the written analysis.
 
 Do not add stochastic rates, mortality, wage growth, inflation, dynamic
 rebalancing, Streamlit, strategy optimization, monthly valuation, monthly
