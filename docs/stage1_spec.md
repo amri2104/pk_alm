@@ -99,17 +99,18 @@ Core responsibilities:
 - Split retirement capital into annuity-financed capital and capital withdrawal.
 - Compute retiree pension present value with annuity-due convention.
 - Generate pension cashflows.
-- Compute technical reserves.
 - Produce obligation snapshots.
 - Report `Pensionierungsverlust`.
 
-The Stage 1 obligation value is:
+The Stage-1 liability value is a transparent proxy:
 
 ```text
-V(t) = active savings capital + retiree PV + technical reserves
+Stage-1 Liability Proxy = active savings capital + retiree obligation PV
 ```
 
-`Pensionierungsverlust` is not added separately to `V(t)` if retiree PV already reflects the full pension obligation.
+`Pensionierungsverlust` is not added separately to the Stage-1 Liability Proxy if retiree obligation PV already reflects the full pension obligation.
+
+Technical reserves are not implemented in Stage 1. They are deferred to Stage 2+ / future actuarial extensions.
 
 ## Asset / ACTUS Portfolio Engine
 
@@ -150,7 +151,7 @@ Initial assets should be calibrated to the initial funding-ratio benchmark, not 
 The calibration principle is:
 
 ```text
-initial assets = V(0) * target funding ratio
+initial assets = Stage-1 Liability Proxy(0) * target funding ratio
 ```
 
 This keeps the model internally consistent when the liability side changes. It also makes the opening funding ratio meaningful and comparable to benchmark assumptions.
@@ -160,14 +161,16 @@ This keeps the model internally consistent when the liability side changes. It a
 The funding ratio is:
 
 ```text
-Deckungsgrad(t) = assets(t) / V(t) * 100
+Deckungsgrad(t) = assets(t) / Stage-1 Liability Proxy(t) * 100
 ```
 
 Where:
 
 ```text
-V(t) = active savings capital + retiree PV + technical reserves
+Stage-1 Liability Proxy(t) = active savings capital(t) + retiree obligation PV(t)
 ```
+
+Technical reserves are not implemented in Stage 1. They are deferred to Stage 2+ / future actuarial extensions.
 
 Assets must reflect both market-value assumptions and cashflow effects. Pension payments and capital withdrawals should reduce available assets unless a scenario explicitly injects liquidity or financing assumptions.
 

@@ -445,7 +445,7 @@ the shared cashflow schema.
 The project pins the pipeline behaviour via tests. To verify reproducibility:
 
 ```bash
-python -m pytest -v
+python3 -m pytest
 ```
 
 To run the demo and produce CSVs:

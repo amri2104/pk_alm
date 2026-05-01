@@ -26,5 +26,6 @@ Domain conventions:
 - Positive `payoff` = inflow to the pension fund.
 - Negative `payoff` = outflow from the pension fund.
 - `source` column is mandatory.
-- `V(t) = active savings capital + retiree PV + technical reserves`.
+- Stage-1 Liability Proxy = active savings capital + retiree obligation PV.
+- Technical reserves are not implemented in Stage 1.
 - `Pensionierungsverlust` is reported as KPI / P&L effect and must not be double-counted if retiree PV already includes it.

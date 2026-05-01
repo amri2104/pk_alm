@@ -16,19 +16,14 @@ empirical findings and are not yet calibrated to a real pension fund.
 Verify the current implementation:
 
 ```bash
-python -m pytest -v
+python3 -m pytest
 ```
 
 Expected current test status:
 
 ```text
-1040 passed, 18 skipped
+1074 passed, 36 skipped
 ```
-
-Historical reference points include **874 passed, 8 skipped** before the
-Sprint 7A asset-boundary work, **809 passed, 8 skipped** before the Sprint
-6B/6C monthly support layers, and **761 passed** in the temporary
-`/tmp/pk_alm_aal_venv` environment with AAL `1.0.12` available.
 
 Run the deterministic Stage-1 baseline example:
 

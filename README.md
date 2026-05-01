@@ -68,14 +68,14 @@ transparent liability proxy with deterministic funding-ratio reporting.
   source modules, tests, examples, docs, or protected Stage-1 outputs.
 - The Stage-1 baseline scenario is available as both a library function and a
   manual-run script.
-- Current tests: **1074 passed, 19 skipped**.
+- Current tests: **1074 passed, 36 skipped**.
 
 ## Quick Run
 
 Run the test suite:
 
 ```bash
-python -m pytest -v
+python3 -m pytest
 ```
 
 Run the Stage-1 baseline demo:
@@ -217,8 +217,7 @@ The current implementation is the **deterministic Stage-1 baseline**:
   show that real AAL `PAM` and `Portfolio` objects can be constructed when AAL
   is available. `PublicActusService.generateEvents(...)` appears
   service-backed via `/eventsBatch`, so no production AAL event adapter has
-  been added. Sprint 5C recorded `753 passed, 8 skipped` in the system
-  environment and `761 passed` in the temporary AAL venv.
+  been added.
 - `src/pk_alm/time_grid.py` provides standalone annual/monthly feasibility
   utilities. The annual baseline remains the reference, and monthly simulation
   is not part of the default Stage-1 run.

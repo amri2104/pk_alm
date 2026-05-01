@@ -26,7 +26,7 @@
 
 **Decision:** BVG liabilities are implemented in a dedicated Python engine rather than forced into ACTUS contract types.
 
-**Rationale:** BVG liabilities involve coordinated salary, age credits, savings capital, conversion rates, pension present values, capital withdrawals, and technical reserves. These are institutional pension fund mechanics, not standard financial contracts.
+**Rationale:** BVG liabilities involve coordinated salary, age credits, savings capital, conversion rates, pension present values, capital withdrawals, and future actuarial reserve mechanics. These are institutional pension fund mechanics, not standard financial contracts.
 
 **Consequence:** The BVG engine emits the same shared cashflow schema as the asset engine so that analytics remain integrated.
 
@@ -36,7 +36,7 @@
 
 **Decision:** Initial assets are calibrated from initial obligations and target funding ratio.
 
-**Rationale:** Fixing assets blindly at CHF 100m can make the opening funding ratio arbitrary. Calibrating assets to `V(0) * target funding ratio` keeps the initial balance sheet internally consistent and benchmark-aligned.
+**Rationale:** Fixing assets blindly at CHF 100m can make the opening funding ratio arbitrary. Calibrating assets to `Stage-1 Liability Proxy(0) * target funding ratio` keeps the initial balance sheet internally consistent and benchmark-aligned.
 
 **Consequence:** Changes to liability assumptions automatically imply a consistent opening asset level.
 
@@ -46,9 +46,9 @@
 
 **Decision:** `Pensionierungsverlust` is reported as a KPI / P&L effect and is not added separately to obligations if retiree PV already includes the full pension obligation.
 
-**Rationale:** At retirement, active savings capital is removed. The annuity-financed part is converted into retiree pension PV. The difference between retiree PV and annuity-financed capital is the retirement loss. Adding it again to `V(t)` would double-count the obligation.
+**Rationale:** At retirement, active savings capital is removed. The annuity-financed part is converted into retiree obligation PV. The difference between retiree obligation PV and annuity-financed capital is the retirement loss. Adding it again to the Stage-1 Liability Proxy would double-count the obligation.
 
-**Consequence:** `V(t)` remains `active savings capital + retiree PV + technical reserves`; `Pensionierungsverlust` is shown separately for interpretation.
+**Consequence:** The Stage-1 Liability Proxy remains `active savings capital + retiree obligation PV`; `Pensionierungsverlust` is shown separately for interpretation. Technical reserves are not implemented in Stage 1 and are deferred to Stage 2+ / future actuarial extensions.
 
 ## ADR 006: Why Demographic Dynamics Come Before Mortality
 

@@ -97,17 +97,11 @@ and prepares benchmark/plausibility tables from caller-provided reference
 values. It does not add Streamlit, stochastic modelling, or new financial
 assumptions.
 
-The full system test suite currently passes with **1058 passed, 18 skipped**.
-Historical reference points: the pre-Sprint 8 result was
-**1040 passed, 18 skipped**; the pre-Sprint 7D system result was
-**968 passed, 14 skipped**; the pre-Sprint 7C result was
-**919 passed, 12 skipped**; the pre-Sprint 7B result was
-**897 passed, 12 skipped**; the pre-Sprint 7A result was
-**874 passed, 8 skipped**; the pre-Sprint 6A result was
-**753 passed, 8 skipped**; and the pre-Sprint 6B/6C result was
-**809 passed, 8 skipped**. With AAL `1.0.12` available in the temporary
-`/tmp/pk_alm_aal_venv` environment, the Sprint 5C AAL-focused suite
-observation was **761 passed**.
+The full system test suite currently passes with **1074 passed, 36 skipped**.
+Historical documentation-status anchors include earlier observations of
+**874 passed, 8 skipped**, **809 passed, 8 skipped**,
+**753 passed, 8 skipped**, and **761 passed** in an AAL-focused temporary
+environment. These are not current expected results.
 
 ## Sprint Summary
 
@@ -145,7 +139,7 @@ observation was **761 passed**.
 | Sprint 7D | AAL Asset Engine v1 | `src/pk_alm/assets/aal_engine.py`, `tests/test_assets_aal_engine.py` | Strategic asset-side engine. `generation_mode="aal"` is the main AAL path; `generation_mode="fallback"` is explicit only for tests/comparison/development; no silent fallback; AAL remains optional through the `[aal]` install profile. | Fallback mode, generation-mode validation, no-silent-fallback behaviour, AAL event mapping, result dataclass invariants, Stage-1 no-side-effect checks, optional real-AAL service-path tests. |
 | Sprint 7E | Full ALM Scenario | `src/pk_alm/scenarios/full_alm_scenario.py`, `tests/test_full_alm_scenario.py` | Combines BVG liability cashflows with AAL Asset Engine cashflows through the shared `CashflowRecord` schema and recomputes annual cashflow analytics without mutating protected Stage-1 outputs. | Combined row count, source preservation, canonical schema validation, deterministic sorting, generation-mode validation, no-silent-fallback behaviour, Stage-1 output protection, optional real-AAL path. |
 | Sprint 7F | ALM KPI / Plot-ready Outputs | `src/pk_alm/analytics/alm_kpis.py`, `tests/test_analytics_alm_kpis.py` | Builds a compact ALM KPI summary, cashflow-by-source plot table, and net-cashflow plot table from Full ALM outputs. No actual matplotlib or Streamlit plots. | KPI dataclass invariants, builder validation, funding-summary consistency, cashflow identity checks, stable output columns, no input mutation. |
-| Sprint 7G | Repository Cleanup Analysis / Hygiene | Read-only cleanup analysis; generated-file hygiene only | Reviewed docs and code architecture, classified core vs support/demo layers, identified unsafe delete candidates, and removed only generated Python caches / `.DS_Store` files. Source modules, tests, examples, docs, and protected Stage-1 outputs were not deleted, renamed, or deprecated. | Full suite stayed green at 1040 passed, 18 skipped after hygiene cleanup. |
+| Sprint 7G | Repository Cleanup Analysis / Hygiene | Read-only cleanup analysis; generated-file hygiene only | Reviewed docs and code architecture, classified core vs support/demo layers, identified unsafe delete candidates, and removed only generated Python caches / `.DS_Store` files. Source modules, tests, examples, docs, and protected Stage-1 outputs were not deleted, renamed, or deprecated. | Full suite stayed green after hygiene cleanup. |
 | Sprint 7I | Documentation Consolidation | `README.md`, `docs/implementation_progress.md`, `docs/stage1_pipeline.md`, `docs/stage1_outputs.md` | Consolidates current sprint naming, repository hygiene status, current test status, AAL Asset Engine, Full ALM Scenario, KPI/plot-ready outputs, and the protected Stage-1 vs Full ALM distinction. | Documentation-only verification through documentation, Stage-1 baseline, Full ALM, KPI, and full-suite tests. |
 | Sprint 8 | Thesis-ready Reporting, Plots, and Benchmark Preparation | `src/pk_alm/reporting/`, `tests/test_reporting_full_alm_export.py`, `tests/test_reporting_plots.py`, `tests/test_reporting_benchmark.py` | Exports Full ALM results to separate CSV files, saves matplotlib PNG plots, and builds caller-reference benchmark/plausibility tables without touching protected Stage-1 outputs. | Export/readback checks, calculation-vs-I/O separation, protected-output rejection, no-silent-fallback checks, PNG creation, input non-mutation, benchmark column and difference checks. |
 
@@ -243,18 +237,10 @@ Generated CSV files (relative to the working directory):
 ## Current Test Status
 
 ```bash
-python -m pytest -v
+python3 -m pytest
 ```
 
-Current expected result: **1058 passed, 18 skipped**.
-
-Sprint 5C also recorded an AAL-available temporary-venv result:
-**761 passed**. The pre-Sprint-6B/6C system result was
-**809 passed, 8 skipped**. The pre-Sprint 7A system result was
-**874 passed, 8 skipped**. The pre-Sprint 7B system result was
-**897 passed, 12 skipped**. The pre-Sprint 7C system result was
-**919 passed, 12 skipped**. The pre-Sprint 7D system result was
-**968 passed, 14 skipped**.
+Current expected result: **1074 passed, 36 skipped**.
 
 The tests are part of the verification strategy for the bachelor thesis. They
 serve as executable documentation: every financial formula has at least one
