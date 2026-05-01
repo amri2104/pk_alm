@@ -68,7 +68,7 @@ transparent liability proxy with deterministic funding-ratio reporting.
   source modules, tests, examples, docs, or protected Stage-1 outputs.
 - The Stage-1 baseline scenario is available as both a library function and a
   manual-run script.
-- Current tests: **1068 passed, 18 skipped**.
+- Current tests: **1074 passed, 19 skipped**.
 
 ## Quick Run
 
@@ -95,6 +95,22 @@ Run the Full ALM reporting workflow with explicit offline fallback:
 ```bash
 python examples/full_alm_reporting_workflow.py
 ```
+
+Run the optional Streamlit prototype:
+
+```bash
+python3 -m pip install -e ".[app]"
+python3 -m streamlit run examples/streamlit_full_alm_app.py
+```
+
+For the Streamlit UI with the AAL asset engine dependency installed:
+
+```bash
+python3 -m pip install -e ".[app,aal]"
+```
+
+The `app` extra installs the Streamlit UI dependency. The `aal` extra installs
+the optional AAL asset-engine dependency.
 
 Run the integrated Full ALM scenario from Python by calling
 `run_full_alm_scenario(...)`. Its default asset path is

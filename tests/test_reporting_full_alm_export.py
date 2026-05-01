@@ -190,7 +190,7 @@ def test_export_does_not_touch_stage1_baseline_outputs(
     assert after == before
 
 
-def test_export_does_not_modify_pyproject_or_add_streamlit(
+def test_export_does_not_modify_pyproject_or_add_streamlit_core_dependency(
     tmp_path,
     fallback_scenario,
 ):
@@ -202,4 +202,7 @@ def test_export_does_not_modify_pyproject_or_add_streamlit(
     after = _PYPROJECT.read_text()
     assert after == before
     assert os.path.getmtime(_PYPROJECT) == before_mtime
-    assert "streamlit" not in after.lower()
+    core_dependencies = after.split("dependencies = [", 1)[1].split("]", 1)[0]
+    dev_dependencies = after.split("dev = [", 1)[1].split("]", 1)[0]
+    assert "streamlit" not in core_dependencies.lower()
+    assert "streamlit" not in dev_dependencies.lower()

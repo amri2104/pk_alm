@@ -160,7 +160,9 @@ def test_generated_files_summary_is_stable(tmp_path):
     )
 
 
-def test_workflow_does_not_modify_pyproject_or_add_streamlit(tmp_path):
+def test_workflow_does_not_modify_pyproject_or_add_streamlit_core_dependency(
+    tmp_path,
+):
     before = _PYPROJECT.read_text()
     before_mtime = os.path.getmtime(_PYPROJECT)
 
@@ -172,4 +174,7 @@ def test_workflow_does_not_modify_pyproject_or_add_streamlit(tmp_path):
     after = _PYPROJECT.read_text()
     assert after == before
     assert os.path.getmtime(_PYPROJECT) == before_mtime
-    assert "streamlit" not in after.lower()
+    core_dependencies = after.split("dependencies = [", 1)[1].split("]", 1)[0]
+    dev_dependencies = after.split("dev = [", 1)[1].split("]", 1)[0]
+    assert "streamlit" not in core_dependencies.lower()
+    assert "streamlit" not in dev_dependencies.lower()

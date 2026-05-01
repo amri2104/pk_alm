@@ -28,3 +28,16 @@ are available.
 
 Full ALM workflow outputs are separate reporting artifacts. They do not
 replace or mutate the protected Stage-1 files in `outputs/stage1_baseline/`.
+
+## Streamlit Prototype
+
+An optional Streamlit prototype can display the same workflow outputs:
+
+```bash
+pip install -e ".[app]"
+python3 -m streamlit run examples/streamlit_full_alm_app.py
+```
+
+Use `pip install -e ".[app,aal]"` when the UI should run the AAL asset-engine
+path. The prototype writes to `outputs/full_alm_streamlit/` by default and is
+only a UI layer over the existing workflow.

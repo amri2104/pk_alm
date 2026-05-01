@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 aal = ["awesome-actus-lib>=1.0.12"]
+app = ["streamlit"]
 dev = [
     "pytest",
     "pytest-cov",
