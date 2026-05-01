@@ -19,6 +19,14 @@ Guardrails:
 - Do not overwrite `outputs/stage1_baseline/*`.
 - Keep Stage-1 equivalence tests for zero population-dynamics levers.
 
+Caveat:
+
+The default Stage-2A demo uses a small population. With `turnover_rate=0.02`
+and deterministic `floor(count * turnover_rate)`, no exits are realised in the
+default run. The default Stage-2A result is therefore mainly driven by annual
+new entrants and salary growth. Turnover functionality is implemented and
+tested separately, but it is not a material driver of the default demo output.
+
 ## Stage 2B Mortality Layer
 
 Add an actuarial mortality layer after the population skeleton is stable.

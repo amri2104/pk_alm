@@ -29,6 +29,9 @@ Scope rules (per ``docs/stage2_spec.md``):
 
 from __future__ import annotations
 
+import math
+import numbers
+
 from pk_alm.bvg.cohorts import ActiveCohort
 from pk_alm.bvg.portfolio import BVGPortfolioState
 
@@ -68,9 +71,15 @@ def apply_salary_growth_to_active_cohort(
             or NaN.
         NotImplementedError: Always, until Sprint 10.
     """
-    raise NotImplementedError(
-        "Stage 2 Bauplan: apply_salary_growth_to_active_cohort "
-        "implementation deferred (Sprint 10)"
+    if not isinstance(cohort, ActiveCohort):
+        raise TypeError(f"cohort must be ActiveCohort, got {type(cohort).__name__}")
+    rate = _validate_salary_growth_rate(salary_growth_rate)
+    return ActiveCohort(
+        cohort_id=cohort.cohort_id,
+        age=cohort.age,
+        count=cohort.count,
+        gross_salary_per_person=cohort.gross_salary_per_person * (1.0 + rate),
+        capital_active_per_person=cohort.capital_active_per_person,
     )
 
 
@@ -103,7 +112,33 @@ def apply_salary_growth_to_portfolio(
             :func:`apply_salary_growth_to_active_cohort`.
         NotImplementedError: Always, until Sprint 10.
     """
-    raise NotImplementedError(
-        "Stage 2 Bauplan: apply_salary_growth_to_portfolio "
-        "implementation deferred (Sprint 10)"
+    if not isinstance(portfolio, BVGPortfolioState):
+        raise TypeError(
+            f"portfolio must be BVGPortfolioState, got {type(portfolio).__name__}"
+        )
+    return BVGPortfolioState(
+        projection_year=portfolio.projection_year,
+        active_cohorts=tuple(
+            apply_salary_growth_to_active_cohort(c, salary_growth_rate)
+            for c in portfolio.active_cohorts
+        ),
+        retired_cohorts=portfolio.retired_cohorts,
     )
+
+
+def _validate_salary_growth_rate(value: object) -> float:
+    if isinstance(value, bool):
+        raise TypeError("salary_growth_rate must not be bool")
+    if not isinstance(value, numbers.Real):
+        raise TypeError(
+            f"salary_growth_rate must be numeric, got {type(value).__name__}"
+        )
+    rate = float(value)
+    if math.isnan(rate):
+        raise ValueError("salary_growth_rate must not be NaN")
+    if rate < 0.0 or rate > MAX_PERMITTED_SALARY_GROWTH_RATE:
+        raise ValueError(
+            "salary_growth_rate must be in "
+            f"[0.0, {MAX_PERMITTED_SALARY_GROWTH_RATE}], got {rate}"
+        )
+    return rate

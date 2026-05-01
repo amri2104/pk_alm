@@ -32,6 +32,8 @@ Cohort ID scheme:
 
 from __future__ import annotations
 
+import math
+import numbers
 from dataclasses import dataclass
 
 from pk_alm.bvg.cohorts import ActiveCohort
@@ -73,15 +75,37 @@ class EntryAssumptions:
     cohort_id_prefix: str = DEFAULT_ENTRY_COHORT_ID_PREFIX
 
     def __post_init__(self) -> None:
-        # Validation rules (final, enforced in Sprint 10):
-        # - entry_age: int >= 0 and not bool
-        # - entry_count_per_year: int >= 0 and not bool
-        # - entry_gross_salary: float >= 0 and not NaN/bool
-        # - entry_capital_per_person: float >= 0 and not NaN/bool
-        # - cohort_id_prefix: non-empty non-whitespace string
-        raise NotImplementedError(
-            "Stage 2 Bauplan: EntryAssumptions validation deferred (Sprint 10)"
+        if isinstance(self.entry_age, bool):
+            raise TypeError("entry_age must not be bool")
+        if not isinstance(self.entry_age, int):
+            raise TypeError(
+                f"entry_age must be int, got {type(self.entry_age).__name__}"
+            )
+        if self.entry_age < 0:
+            raise ValueError(f"entry_age must be >= 0, got {self.entry_age}")
+
+        if isinstance(self.entry_count_per_year, bool):
+            raise TypeError("entry_count_per_year must not be bool")
+        if not isinstance(self.entry_count_per_year, int):
+            raise TypeError(
+                "entry_count_per_year must be int, "
+                f"got {type(self.entry_count_per_year).__name__}"
+            )
+        if self.entry_count_per_year < 0:
+            raise ValueError(
+                "entry_count_per_year must be >= 0, "
+                f"got {self.entry_count_per_year}"
+            )
+
+        _validate_non_negative_real(
+            self.entry_gross_salary, "entry_gross_salary"
         )
+        _validate_non_negative_real(
+            self.entry_capital_per_person, "entry_capital_per_person"
+        )
+
+        if not isinstance(self.cohort_id_prefix, str) or not self.cohort_id_prefix.strip():
+            raise ValueError("cohort_id_prefix must be a non-empty string")
 
 
 def get_default_entry_assumptions() -> EntryAssumptions:
@@ -94,9 +118,7 @@ def get_default_entry_assumptions() -> EntryAssumptions:
         - entry_capital_per_person = 0 (ADR 009)
         - cohort_id_prefix = "ENTRY"
     """
-    raise NotImplementedError(
-        "Stage 2 Bauplan: get_default_entry_assumptions deferred (Sprint 10)"
-    )
+    return EntryAssumptions()
 
 
 def generate_entry_cohort_for_year(
@@ -120,8 +142,28 @@ def generate_entry_cohort_for_year(
         TypeError / ValueError on invalid inputs.
         NotImplementedError: Always, until Sprint 10.
     """
-    raise NotImplementedError(
-        "Stage 2 Bauplan: generate_entry_cohort_for_year deferred (Sprint 10)"
+    if not isinstance(assumptions, EntryAssumptions):
+        raise TypeError(
+            f"assumptions must be EntryAssumptions, got {type(assumptions).__name__}"
+        )
+    if isinstance(calendar_year, bool):
+        raise TypeError("calendar_year must not be bool")
+    if not isinstance(calendar_year, int):
+        raise TypeError(
+            f"calendar_year must be int, got {type(calendar_year).__name__}"
+        )
+    if not isinstance(nonce, str) or not nonce.strip():
+        raise ValueError("nonce must be a non-empty string")
+
+    if assumptions.entry_count_per_year == 0:
+        return None
+
+    return ActiveCohort(
+        cohort_id=f"{assumptions.cohort_id_prefix}_{calendar_year}_{nonce}",
+        age=assumptions.entry_age,
+        count=assumptions.entry_count_per_year,
+        gross_salary_per_person=assumptions.entry_gross_salary,
+        capital_active_per_person=assumptions.entry_capital_per_person,
     )
 
 
@@ -144,8 +186,20 @@ def build_entry_cashflow_record(
     Raises:
         NotImplementedError: Always, until Sprint 10.
     """
-    raise NotImplementedError(
-        "Stage 2 Bauplan: build_entry_cashflow_record deferred (Sprint 10)"
+    if not isinstance(cohort, ActiveCohort):
+        raise TypeError(f"cohort must be ActiveCohort, got {type(cohort).__name__}")
+    if cohort.capital_active_per_person == 0:
+        return None
+
+    payoff = cohort.count * cohort.capital_active_per_person
+    return CashflowRecord(
+        contractId=cohort.cohort_id,
+        time=event_date,
+        type=IN_EVENT_TYPE,
+        payoff=payoff,
+        nominalValue=payoff,
+        currency="CHF",
+        source="BVG",
     )
 
 
@@ -176,7 +230,39 @@ def apply_entries_to_portfolio(
     Raises:
         NotImplementedError: Always, until Sprint 10.
     """
-    raise NotImplementedError(
-        "Stage 2 Bauplan: apply_entries_to_portfolio "
-        "implementation deferred (Sprint 10)"
+    if not isinstance(portfolio, BVGPortfolioState):
+        raise TypeError(
+            f"portfolio must be BVGPortfolioState, got {type(portfolio).__name__}"
+        )
+    if not isinstance(assumptions, EntryAssumptions):
+        raise TypeError(
+            f"assumptions must be EntryAssumptions, got {type(assumptions).__name__}"
+        )
+
+    entry_cohort = generate_entry_cohort_for_year(
+        assumptions, calendar_year, nonce="0"
     )
+    if entry_cohort is None:
+        return portfolio, ()
+
+    in_record = build_entry_cashflow_record(entry_cohort, event_date)
+    new_portfolio = BVGPortfolioState(
+        projection_year=portfolio.projection_year,
+        active_cohorts=tuple(portfolio.active_cohorts) + (entry_cohort,),
+        retired_cohorts=portfolio.retired_cohorts,
+    )
+    in_records = (in_record,) if in_record is not None else ()
+    return new_portfolio, in_records
+
+
+def _validate_non_negative_real(value: object, name: str) -> float:
+    if isinstance(value, bool):
+        raise TypeError(f"{name} must not be bool")
+    if not isinstance(value, numbers.Real):
+        raise TypeError(f"{name} must be numeric, got {type(value).__name__}")
+    fval = float(value)
+    if math.isnan(fval):
+        raise ValueError(f"{name} must not be NaN")
+    if fval < 0:
+        raise ValueError(f"{name} must be >= 0, got {fval}")
+    return fval

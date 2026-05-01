@@ -34,6 +34,8 @@ Scope rules (per ``docs/stage2_spec.md``):
 
 from __future__ import annotations
 
+import math
+import numbers
 from dataclasses import dataclass
 
 from pk_alm.bvg.cohorts import ActiveCohort
@@ -69,16 +71,50 @@ class TurnoverResult:
     portfolio_state: BVGPortfolioState
     cashflow_records: tuple[CashflowRecord, ...]
     rounding_residual_count: float
+    exited_count: int
 
     def __post_init__(self) -> None:
-        # Validation rules (final, will be enforced in Sprint 10):
-        # - portfolio_state: BVGPortfolioState
-        # - cashflow_records: tuple of CashflowRecord; all type == "EX";
-        #   all source == "BVG"; all payoff <= 0.
-        # - rounding_residual_count: float in [0.0, len(active_cohorts)).
-        raise NotImplementedError(
-            "Stage 2 Bauplan: TurnoverResult validation deferred (Sprint 10)"
+        if not isinstance(self.portfolio_state, BVGPortfolioState):
+            raise TypeError(
+                "portfolio_state must be BVGPortfolioState, "
+                f"got {type(self.portfolio_state).__name__}"
+            )
+        if not isinstance(self.cashflow_records, tuple):
+            raise TypeError(
+                f"cashflow_records must be tuple, got {type(self.cashflow_records).__name__}"
+            )
+        for i, record in enumerate(self.cashflow_records):
+            if not isinstance(record, CashflowRecord):
+                raise TypeError(
+                    f"cashflow_records[{i}] must be CashflowRecord, "
+                    f"got {type(record).__name__}"
+                )
+            if record.type != EX_EVENT_TYPE:
+                raise ValueError(
+                    f"cashflow_records[{i}].type must be {EX_EVENT_TYPE!r}"
+                )
+            if record.source != "BVG":
+                raise ValueError("EX cashflow source must be 'BVG'")
+            if record.payoff > 0:
+                raise ValueError("EX cashflow payoff must be <= 0")
+
+        residual = _validate_non_bool_real(
+            self.rounding_residual_count, "rounding_residual_count"
         )
+        if residual < 0:
+            raise ValueError(
+                "rounding_residual_count must be >= 0, "
+                f"got {self.rounding_residual_count}"
+            )
+
+        if isinstance(self.exited_count, bool):
+            raise TypeError("exited_count must not be bool")
+        if not isinstance(self.exited_count, int):
+            raise TypeError(
+                f"exited_count must be int, got {type(self.exited_count).__name__}"
+            )
+        if self.exited_count < 0:
+            raise ValueError(f"exited_count must be >= 0, got {self.exited_count}")
 
     @property
     def cashflow_count(self) -> int:
@@ -89,7 +125,7 @@ def apply_turnover_to_active_cohort(
     cohort: ActiveCohort,
     turnover_rate: float,
     event_date: object,
-) -> tuple[ActiveCohort | None, CashflowRecord | None, float]:
+) -> tuple[ActiveCohort | None, CashflowRecord | None, float, int]:
     """Apply turnover to one active cohort.
 
     Formula::
@@ -120,10 +156,38 @@ def apply_turnover_to_active_cohort(
         ValueError: Out-of-range rates, invalid event_date.
         NotImplementedError: Always, until Sprint 10.
     """
-    raise NotImplementedError(
-        "Stage 2 Bauplan: apply_turnover_to_active_cohort "
-        "implementation deferred (Sprint 10)"
+    if not isinstance(cohort, ActiveCohort):
+        raise TypeError(f"cohort must be ActiveCohort, got {type(cohort).__name__}")
+    rate = _validate_turnover_rate(turnover_rate)
+
+    departing = math.floor(cohort.count * rate)
+    residual = cohort.count * rate - departing
+    if departing == 0:
+        return cohort, None, residual, 0
+
+    vested_capital = departing * cohort.capital_active_per_person
+    ex_record = CashflowRecord(
+        contractId=cohort.cohort_id,
+        time=event_date,
+        type=EX_EVENT_TYPE,
+        payoff=-vested_capital,
+        nominalValue=vested_capital,
+        currency="CHF",
+        source="BVG",
     )
+
+    remaining = cohort.count - departing
+    if remaining == 0:
+        surviving = None
+    else:
+        surviving = ActiveCohort(
+            cohort_id=cohort.cohort_id,
+            age=cohort.age,
+            count=remaining,
+            gross_salary_per_person=cohort.gross_salary_per_person,
+            capital_active_per_person=cohort.capital_active_per_person,
+        )
+    return surviving, ex_record, residual, departing
 
 
 def apply_turnover_to_portfolio(
@@ -155,7 +219,57 @@ def apply_turnover_to_portfolio(
         ValueError: Out-of-range turnover_rate.
         NotImplementedError: Always, until Sprint 10.
     """
-    raise NotImplementedError(
-        "Stage 2 Bauplan: apply_turnover_to_portfolio "
-        "implementation deferred (Sprint 10)"
+    if not isinstance(portfolio, BVGPortfolioState):
+        raise TypeError(
+            f"portfolio must be BVGPortfolioState, got {type(portfolio).__name__}"
+        )
+    _validate_turnover_rate(turnover_rate)
+
+    surviving_active: list[ActiveCohort] = []
+    records: list[CashflowRecord] = []
+    total_residual = 0.0
+    exited_count = 0
+
+    for cohort in portfolio.active_cohorts:
+        surviving, record, residual, departed = apply_turnover_to_active_cohort(
+            cohort, turnover_rate, event_date
+        )
+        if surviving is not None:
+            surviving_active.append(surviving)
+        if record is not None:
+            records.append(record)
+        total_residual += residual
+        exited_count += departed
+
+    new_portfolio = BVGPortfolioState(
+        projection_year=portfolio.projection_year,
+        active_cohorts=tuple(surviving_active),
+        retired_cohorts=portfolio.retired_cohorts,
     )
+    return TurnoverResult(
+        portfolio_state=new_portfolio,
+        cashflow_records=tuple(records),
+        rounding_residual_count=total_residual,
+        exited_count=exited_count,
+    )
+
+
+def _validate_non_bool_real(value: object, name: str) -> float:
+    if isinstance(value, bool):
+        raise TypeError(f"{name} must not be bool")
+    if not isinstance(value, numbers.Real):
+        raise TypeError(f"{name} must be numeric, got {type(value).__name__}")
+    fval = float(value)
+    if math.isnan(fval):
+        raise ValueError(f"{name} must not be NaN")
+    return fval
+
+
+def _validate_turnover_rate(value: object) -> float:
+    rate = _validate_non_bool_real(value, "turnover_rate")
+    if rate < 0.0 or rate > MAX_PERMITTED_TURNOVER_RATE:
+        raise ValueError(
+            "turnover_rate must be in "
+            f"[0.0, {MAX_PERMITTED_TURNOVER_RATE}], got {rate}"
+        )
+    return rate

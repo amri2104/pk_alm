@@ -26,8 +26,38 @@ from pathlib import Path
 
 import pandas as pd
 
-from pk_alm.bvg.engine_stage2 import Stage2EngineResult
+from pk_alm.analytics.cashflows import (
+    find_liquidity_inflection_year,
+    summarize_cashflows_by_year,
+    validate_annual_cashflow_dataframe,
+)
+from pk_alm.analytics.funding import (
+    build_funding_ratio_trajectory,
+    validate_funding_ratio_dataframe,
+)
+from pk_alm.analytics.funding_summary import (
+    funding_summary_to_dataframe,
+    summarize_funding_ratio,
+    validate_funding_summary_dataframe,
+)
+from pk_alm.assets.deterministic import (
+    build_deterministic_asset_trajectory,
+    validate_asset_dataframe,
+)
+from pk_alm.bvg.engine_stage2 import Stage2EngineResult, run_bvg_engine_stage2
 from pk_alm.bvg.entry_dynamics import EntryAssumptions
+from pk_alm.bvg.portfolio import BVGPortfolioState
+from pk_alm.bvg.valuation import (
+    validate_valuation_dataframe,
+    value_portfolio_states,
+)
+from pk_alm.cashflows.schema import validate_cashflow_dataframe
+from pk_alm.scenarios.result_summary import (
+    build_scenario_result_summary,
+    scenario_result_summary_to_dataframe,
+    validate_scenario_result_dataframe,
+)
+from pk_alm.scenarios.stage1_baseline import build_default_stage1_portfolio
 
 STAGE2_OUTPUT_FILENAMES: tuple[str, ...] = (
     "cashflows.csv",
@@ -76,22 +106,33 @@ class Stage2BaselineResult:
     output_dir: Path | None
 
     def __post_init__(self) -> None:
-        # Validation rules (final, enforced in Sprint 10):
-        # - scenario_id: non-empty non-whitespace string
-        # - engine_result: Stage2EngineResult
-        # - valuation_snapshots: validate_valuation_dataframe
-        # - annual_cashflows: validate_annual_cashflow_dataframe
-        # - asset_snapshots / funding_ratio_trajectory / funding_summary /
-        #   scenario_summary: pandas DataFrames matching their respective
-        #   contracts (mirrored from Stage 1)
-        # - demographic_summary: schema defined in section "Demographic
-        #   summary CSV" of docs/stage2_spec.md
-        # - cashflows_by_type: schema with columns
-        #   (reporting_year, type, total_payoff)
-        # - output_dir: Path or None
-        raise NotImplementedError(
-            "Stage 2 Bauplan: Stage2BaselineResult validation deferred (Sprint 10)"
+        if not isinstance(self.scenario_id, str) or not self.scenario_id.strip():
+            raise ValueError("scenario_id must be a non-empty string")
+        if not isinstance(self.engine_result, Stage2EngineResult):
+            raise TypeError(
+                "engine_result must be Stage2EngineResult, "
+                f"got {type(self.engine_result).__name__}"
+            )
+        _validate_dataframe(self.valuation_snapshots, "valuation_snapshots")
+        validate_valuation_dataframe(self.valuation_snapshots)
+        _validate_dataframe(self.annual_cashflows, "annual_cashflows")
+        validate_annual_cashflow_dataframe(self.annual_cashflows)
+        _validate_dataframe(self.asset_snapshots, "asset_snapshots")
+        validate_asset_dataframe(self.asset_snapshots)
+        _validate_dataframe(
+            self.funding_ratio_trajectory, "funding_ratio_trajectory"
         )
+        validate_funding_ratio_dataframe(self.funding_ratio_trajectory)
+        _validate_dataframe(self.funding_summary, "funding_summary")
+        validate_funding_summary_dataframe(self.funding_summary)
+        _validate_dataframe(self.scenario_summary, "scenario_summary")
+        validate_scenario_result_dataframe(self.scenario_summary)
+        _validate_demographic_summary(self.demographic_summary)
+        _validate_cashflows_by_type(self.cashflows_by_type)
+        if self.output_dir is not None and not isinstance(self.output_dir, Path):
+            raise TypeError(
+                f"output_dir must be Path or None, got {type(self.output_dir).__name__}"
+            )
 
 
 def build_default_initial_portfolio_stage2():
@@ -108,9 +149,7 @@ def build_default_initial_portfolio_stage2():
     Raises:
         NotImplementedError: Always, until Sprint 10.
     """
-    raise NotImplementedError(
-        "Stage 2 Bauplan: build_default_initial_portfolio_stage2 deferred (Sprint 10)"
-    )
+    return build_default_stage1_portfolio()
 
 
 def run_stage2_baseline(
@@ -127,7 +166,7 @@ def run_stage2_baseline(
     salary_growth_rate: float = 0.015,
     turnover_rate: float = 0.02,
     entry_assumptions: EntryAssumptions | None = None,
-    output_dir: str | Path | None = "outputs/stage2_baseline",
+    output_dir: str | Path | None = "outputs/stage2a_population",
 ) -> Stage2BaselineResult:
     """Run the Stage-2 baseline end-to-end with optional CSV export.
 
@@ -175,6 +214,211 @@ def run_stage2_baseline(
         ``run_stage2_baseline(...)`` and asserts ``outputs/stage1_baseline/``
         is unchanged.
     """
-    raise NotImplementedError(
-        "Stage 2 Bauplan: run_stage2_baseline implementation deferred (Sprint 10)"
+    if not isinstance(scenario_id, str) or not scenario_id.strip():
+        raise ValueError("scenario_id must be a non-empty string")
+
+    initial_state = build_default_initial_portfolio_stage2()
+    if not isinstance(initial_state, BVGPortfolioState):
+        raise TypeError("Stage-2 default portfolio must be BVGPortfolioState")
+
+    engine_result = run_bvg_engine_stage2(
+        initial_state=initial_state,
+        horizon_years=horizon_years,
+        active_interest_rate=active_interest_rate,
+        retired_interest_rate=retired_interest_rate,
+        salary_growth_rate=salary_growth_rate,
+        turnover_rate=turnover_rate,
+        entry_assumptions=entry_assumptions,
+        contribution_multiplier=contribution_multiplier,
+        start_year=start_year,
     )
+    validate_cashflow_dataframe(engine_result.cashflows)
+
+    valuation_snapshots = value_portfolio_states(
+        engine_result.portfolio_states,
+        technical_interest_rate,
+        valuation_terminal_age,
+    )
+    validate_valuation_dataframe(valuation_snapshots)
+
+    annual_cashflows = summarize_cashflows_by_year(engine_result.cashflows)
+    validate_annual_cashflow_dataframe(annual_cashflows)
+
+    asset_snapshots = build_deterministic_asset_trajectory(
+        valuation_snapshots,
+        annual_cashflows,
+        target_funding_ratio=target_funding_ratio,
+        annual_return_rate=annual_asset_return,
+        start_year=start_year,
+    )
+    validate_asset_dataframe(asset_snapshots)
+
+    funding_ratio_trajectory = build_funding_ratio_trajectory(
+        asset_snapshots,
+        valuation_snapshots,
+    )
+    validate_funding_ratio_dataframe(funding_ratio_trajectory)
+
+    funding_summary_obj = summarize_funding_ratio(
+        funding_ratio_trajectory,
+        target_funding_ratio=target_funding_ratio,
+    )
+    funding_summary = funding_summary_to_dataframe(funding_summary_obj)
+    validate_funding_summary_dataframe(funding_summary)
+
+    inflection_structural = find_liquidity_inflection_year(
+        annual_cashflows, use_structural=True
+    )
+    inflection_net = find_liquidity_inflection_year(
+        annual_cashflows, use_structural=False
+    )
+
+    scenario_summary_obj = build_scenario_result_summary(
+        scenario_id=scenario_id,
+        valuation_snapshots=valuation_snapshots,
+        annual_cashflows=annual_cashflows,
+        asset_snapshots=asset_snapshots,
+        funding_ratio_trajectory=funding_ratio_trajectory,
+        funding_summary=funding_summary,
+        liquidity_inflection_year_structural=inflection_structural,
+        liquidity_inflection_year_net=inflection_net,
+    )
+    scenario_summary = scenario_result_summary_to_dataframe(scenario_summary_obj)
+    validate_scenario_result_dataframe(scenario_summary)
+
+    demographic_summary = _build_demographic_summary(engine_result)
+    cashflows_by_type = _build_cashflows_by_type(engine_result.cashflows)
+
+    resolved_output_dir: Path | None = None
+    if output_dir is not None:
+        resolved_output_dir = Path(output_dir)
+        resolved_output_dir.mkdir(parents=True, exist_ok=True)
+        outputs = {
+            "cashflows.csv": engine_result.cashflows,
+            "valuation_snapshots.csv": valuation_snapshots,
+            "annual_cashflows.csv": annual_cashflows,
+            "asset_snapshots.csv": asset_snapshots,
+            "funding_ratio_trajectory.csv": funding_ratio_trajectory,
+            "funding_summary.csv": funding_summary,
+            "scenario_summary.csv": scenario_summary,
+            "demographic_summary.csv": demographic_summary,
+            "cashflows_by_type.csv": cashflows_by_type,
+        }
+        for filename in STAGE2_OUTPUT_FILENAMES:
+            outputs[filename].to_csv(resolved_output_dir / filename, index=False)
+
+    return Stage2BaselineResult(
+        scenario_id=scenario_id,
+        engine_result=engine_result,
+        valuation_snapshots=valuation_snapshots,
+        annual_cashflows=annual_cashflows,
+        asset_snapshots=asset_snapshots,
+        funding_ratio_trajectory=funding_ratio_trajectory,
+        funding_summary=funding_summary,
+        scenario_summary=scenario_summary,
+        demographic_summary=demographic_summary,
+        cashflows_by_type=cashflows_by_type,
+        output_dir=resolved_output_dir,
+    )
+
+
+DEMOGRAPHIC_SUMMARY_COLUMNS = (
+    "projection_year",
+    "entries",
+    "exits",
+    "retirements",
+    "turnover_residual",
+    "active_count_end",
+    "retired_count_end",
+)
+
+CASHFLOWS_BY_TYPE_COLUMNS = (
+    "reporting_year",
+    "type",
+    "total_payoff",
+)
+
+
+def _build_demographic_summary(engine_result: Stage2EngineResult) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+    for year_idx in range(engine_result.horizon_years):
+        end_state = engine_result.portfolio_states[year_idx + 1]
+        rows.append(
+            {
+                "projection_year": year_idx + 1,
+                "entries": engine_result.per_year_entries[year_idx],
+                "exits": engine_result.per_year_exits[year_idx],
+                "retirements": engine_result.per_year_retirements[year_idx],
+                "turnover_residual": (
+                    engine_result.turnover_rounding_residual_count[year_idx]
+                ),
+                "active_count_end": end_state.active_count_total,
+                "retired_count_end": end_state.retired_count_total,
+            }
+        )
+    df = pd.DataFrame(rows, columns=list(DEMOGRAPHIC_SUMMARY_COLUMNS))
+    _validate_demographic_summary(df)
+    return df
+
+
+def _build_cashflows_by_type(cashflows: pd.DataFrame) -> pd.DataFrame:
+    validate_cashflow_dataframe(cashflows)
+    if cashflows.empty:
+        df = pd.DataFrame(columns=list(CASHFLOWS_BY_TYPE_COLUMNS))
+    else:
+        work = cashflows.copy(deep=True)
+        work["reporting_year"] = pd.to_datetime(work["time"]).dt.year.astype(int)
+        df = (
+            work.groupby(["reporting_year", "type"], as_index=False)["payoff"]
+            .sum()
+            .rename(columns={"payoff": "total_payoff"})
+        )
+        df = df[list(CASHFLOWS_BY_TYPE_COLUMNS)]
+    _validate_cashflows_by_type(df)
+    return df
+
+
+def _validate_dataframe(df: object, name: str) -> None:
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError(f"{name} must be pandas DataFrame, got {type(df).__name__}")
+
+
+def _validate_demographic_summary(df: pd.DataFrame) -> bool:
+    _validate_dataframe(df, "demographic_summary")
+    if list(df.columns) != list(DEMOGRAPHIC_SUMMARY_COLUMNS):
+        raise ValueError(
+            "demographic_summary columns must be "
+            f"{list(DEMOGRAPHIC_SUMMARY_COLUMNS)}, got {list(df.columns)}"
+        )
+    for idx, row in df.iterrows():
+        for column in (
+            "projection_year",
+            "entries",
+            "exits",
+            "retirements",
+            "active_count_end",
+            "retired_count_end",
+        ):
+            value = row[column]
+            if isinstance(value, bool) or int(value) != value or int(value) < 0:
+                raise ValueError(f"row {idx}: {column} must be a non-negative int")
+        residual = float(row["turnover_residual"])
+        if residual < 0:
+            raise ValueError("turnover_residual must be >= 0")
+    return True
+
+
+def _validate_cashflows_by_type(df: pd.DataFrame) -> bool:
+    _validate_dataframe(df, "cashflows_by_type")
+    if list(df.columns) != list(CASHFLOWS_BY_TYPE_COLUMNS):
+        raise ValueError(
+            "cashflows_by_type columns must be "
+            f"{list(CASHFLOWS_BY_TYPE_COLUMNS)}, got {list(df.columns)}"
+        )
+    for idx, row in df.iterrows():
+        if isinstance(row["reporting_year"], bool) or int(row["reporting_year"]) != row["reporting_year"]:
+            raise ValueError(f"row {idx}: reporting_year must be int")
+        if not isinstance(row["type"], str) or not row["type"].strip():
+            raise ValueError(f"row {idx}: type must be a non-empty string")
+        float(row["total_payoff"])
+    return True

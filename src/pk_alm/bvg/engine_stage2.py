@@ -26,12 +26,34 @@ Equivalence guarantee (mandatory test):
 
 from __future__ import annotations
 
+import math
+import numbers
 from dataclasses import dataclass
 
 import pandas as pd
 
-from pk_alm.bvg.entry_dynamics import EntryAssumptions
+from pk_alm.bvg.cashflow_generation import generate_bvg_cashflow_dataframe_for_state
+from pk_alm.bvg.entry_dynamics import (
+    EntryAssumptions,
+    apply_entries_to_portfolio,
+    get_default_entry_assumptions,
+)
 from pk_alm.bvg.portfolio import BVGPortfolioState
+from pk_alm.bvg.portfolio_projection import project_portfolio_one_year
+from pk_alm.bvg.retirement_transition import apply_retirement_transitions_to_portfolio
+from pk_alm.bvg.salary_dynamics import (
+    MAX_PERMITTED_SALARY_GROWTH_RATE,
+    apply_salary_growth_to_portfolio,
+)
+from pk_alm.bvg.turnover import (
+    MAX_PERMITTED_TURNOVER_RATE,
+    apply_turnover_to_portfolio,
+)
+from pk_alm.cashflows.schema import (
+    CASHFLOW_COLUMNS,
+    cashflow_records_to_dataframe,
+    validate_cashflow_dataframe,
+)
 
 
 @dataclass(frozen=True)
@@ -76,18 +98,62 @@ class Stage2EngineResult:
     entry_assumptions: EntryAssumptions
 
     def __post_init__(self) -> None:
-        # Validation rules (final, enforced in Sprint 10):
-        # - portfolio_states: tuple of BVGPortfolioState, len >= 1
-        # - cashflows: validate_cashflow_dataframe (all source == "BVG")
-        # - turnover_rounding_residual_count: tuple of float
-        # - per_year_entries / per_year_exits / per_year_retirements:
-        #     tuple of int >= 0, all length == horizon_years
-        # - salary_growth_rate: float >= 0
-        # - turnover_rate: float in [0, MAX_PERMITTED_TURNOVER_RATE]
-        # - entry_assumptions: EntryAssumptions
-        raise NotImplementedError(
-            "Stage 2 Bauplan: Stage2EngineResult validation deferred (Sprint 10)"
+        if not isinstance(self.portfolio_states, tuple):
+            raise TypeError(
+                f"portfolio_states must be tuple, got {type(self.portfolio_states).__name__}"
+            )
+        if len(self.portfolio_states) == 0:
+            raise ValueError("portfolio_states must not be empty")
+        for i, state in enumerate(self.portfolio_states):
+            if not isinstance(state, BVGPortfolioState):
+                raise TypeError(
+                    f"portfolio_states[{i}] must be BVGPortfolioState, "
+                    f"got {type(state).__name__}"
+                )
+
+        if not isinstance(self.cashflows, pd.DataFrame):
+            raise TypeError(
+                f"cashflows must be pandas DataFrame, got {type(self.cashflows).__name__}"
+            )
+        validate_cashflow_dataframe(self.cashflows)
+        if not self.cashflows.empty and set(self.cashflows["source"]) != {"BVG"}:
+            raise ValueError("cashflows source must be BVG")
+
+        horizon_years = len(self.portfolio_states) - 1
+        _validate_float_tuple(
+            self.turnover_rounding_residual_count,
+            "turnover_rounding_residual_count",
+            horizon_years,
         )
+        _validate_int_tuple(self.per_year_entries, "per_year_entries", horizon_years)
+        _validate_int_tuple(self.per_year_exits, "per_year_exits", horizon_years)
+        _validate_int_tuple(
+            self.per_year_retirements, "per_year_retirements", horizon_years
+        )
+
+        salary_growth_rate = _validate_non_bool_real(
+            self.salary_growth_rate, "salary_growth_rate"
+        )
+        if (
+            salary_growth_rate < 0.0
+            or salary_growth_rate > MAX_PERMITTED_SALARY_GROWTH_RATE
+        ):
+            raise ValueError(
+                "salary_growth_rate must be in "
+                f"[0.0, {MAX_PERMITTED_SALARY_GROWTH_RATE}], "
+                f"got {salary_growth_rate}"
+            )
+        turnover_rate = _validate_non_bool_real(self.turnover_rate, "turnover_rate")
+        if turnover_rate < 0.0 or turnover_rate > MAX_PERMITTED_TURNOVER_RATE:
+            raise ValueError(
+                "turnover_rate must be in "
+                f"[0.0, {MAX_PERMITTED_TURNOVER_RATE}], got {turnover_rate}"
+            )
+        if not isinstance(self.entry_assumptions, EntryAssumptions):
+            raise TypeError(
+                "entry_assumptions must be EntryAssumptions, "
+                f"got {type(self.entry_assumptions).__name__}"
+            )
 
     @property
     def initial_state(self) -> BVGPortfolioState:
@@ -179,6 +245,208 @@ def run_bvg_engine_stage2(
         bit-identical to ``run_bvg_engine`` for the same other inputs.
         This is enforced as a mandatory regression test.
     """
-    raise NotImplementedError(
-        "Stage 2 Bauplan: run_bvg_engine_stage2 implementation deferred (Sprint 10)"
+    if not isinstance(initial_state, BVGPortfolioState):
+        raise TypeError(
+            f"initial_state must be BVGPortfolioState, got {type(initial_state).__name__}"
+        )
+
+    horizon_years = _validate_non_bool_int(horizon_years, "horizon_years")
+    if horizon_years < 0:
+        raise ValueError(f"horizon_years must be >= 0, got {horizon_years}")
+
+    active_interest_rate = _validate_non_bool_real(
+        active_interest_rate, "active_interest_rate"
     )
+    if active_interest_rate <= -1:
+        raise ValueError(
+            f"active_interest_rate must be > -1, got {active_interest_rate}"
+        )
+    retired_interest_rate = _validate_non_bool_real(
+        retired_interest_rate, "retired_interest_rate"
+    )
+    if retired_interest_rate <= -1:
+        raise ValueError(
+            f"retired_interest_rate must be > -1, got {retired_interest_rate}"
+        )
+
+    salary_growth_rate = _validate_non_bool_real(
+        salary_growth_rate, "salary_growth_rate"
+    )
+    if (
+        salary_growth_rate < 0.0
+        or salary_growth_rate > MAX_PERMITTED_SALARY_GROWTH_RATE
+    ):
+        raise ValueError(
+            "salary_growth_rate must be in "
+            f"[0.0, {MAX_PERMITTED_SALARY_GROWTH_RATE}], got {salary_growth_rate}"
+        )
+    turnover_rate = _validate_non_bool_real(turnover_rate, "turnover_rate")
+    if turnover_rate < 0.0 or turnover_rate > MAX_PERMITTED_TURNOVER_RATE:
+        raise ValueError(
+            "turnover_rate must be in "
+            f"[0.0, {MAX_PERMITTED_TURNOVER_RATE}], got {turnover_rate}"
+        )
+
+    contribution_multiplier = _validate_non_bool_real(
+        contribution_multiplier, "contribution_multiplier"
+    )
+    if contribution_multiplier < 0:
+        raise ValueError(
+            f"contribution_multiplier must be >= 0, got {contribution_multiplier}"
+        )
+    start_year = _validate_non_bool_int(start_year, "start_year")
+    if start_year < 2000:
+        raise ValueError(f"start_year must be >= 2000, got {start_year}")
+    retirement_age = _validate_non_bool_int(retirement_age, "retirement_age")
+    if retirement_age < 0:
+        raise ValueError(f"retirement_age must be >= 0, got {retirement_age}")
+
+    capital_withdrawal_fraction = _validate_non_bool_real(
+        capital_withdrawal_fraction, "capital_withdrawal_fraction"
+    )
+    if capital_withdrawal_fraction < 0.0 or capital_withdrawal_fraction > 1.0:
+        raise ValueError(
+            "capital_withdrawal_fraction must be in [0.0, 1.0], "
+            f"got {capital_withdrawal_fraction}"
+        )
+    conversion_rate = _validate_non_bool_real(conversion_rate, "conversion_rate")
+    if conversion_rate < 0:
+        raise ValueError(f"conversion_rate must be >= 0, got {conversion_rate}")
+
+    if entry_assumptions is None:
+        entry_assumptions_resolved = get_default_entry_assumptions()
+    elif isinstance(entry_assumptions, EntryAssumptions):
+        entry_assumptions_resolved = entry_assumptions
+    else:
+        raise TypeError(
+            "entry_assumptions must be EntryAssumptions or None, "
+            f"got {type(entry_assumptions).__name__}"
+        )
+    if entry_assumptions_resolved.entry_age >= retirement_age:
+        raise ValueError(
+            "entry_assumptions.entry_age must be < retirement_age "
+            f"({entry_assumptions_resolved.entry_age} >= {retirement_age})"
+        )
+
+    states: list[BVGPortfolioState] = [initial_state]
+    cashflow_frames: list[pd.DataFrame] = []
+    residuals: list[float] = []
+    per_year_entries: list[int] = []
+    per_year_exits: list[int] = []
+    per_year_retirements: list[int] = []
+    current_state = initial_state
+
+    for step in range(horizon_years):
+        calendar_year = start_year + step
+        event_date = pd.Timestamp(f"{calendar_year}-12-31")
+
+        regular_df = generate_bvg_cashflow_dataframe_for_state(
+            current_state, event_date, contribution_multiplier
+        )
+
+        turnover_result = apply_turnover_to_portfolio(
+            current_state, turnover_rate, event_date
+        )
+        ex_df = cashflow_records_to_dataframe(turnover_result.cashflow_records)
+        post_turnover = turnover_result.portfolio_state
+
+        projected = project_portfolio_one_year(
+            post_turnover, active_interest_rate, retired_interest_rate
+        )
+
+        grown = apply_salary_growth_to_portfolio(projected, salary_growth_rate)
+
+        retiring_persons = sum(
+            cohort.count for cohort in grown.active_cohorts
+            if cohort.age >= retirement_age
+        )
+        transition = apply_retirement_transitions_to_portfolio(
+            grown,
+            event_date,
+            retirement_age=retirement_age,
+            capital_withdrawal_fraction=capital_withdrawal_fraction,
+            conversion_rate=conversion_rate,
+        )
+        retire_df = cashflow_records_to_dataframe(transition.cashflow_records)
+
+        post_entry, in_records = apply_entries_to_portfolio(
+            transition.portfolio_state,
+            entry_assumptions_resolved,
+            calendar_year,
+            event_date,
+        )
+        in_df = cashflow_records_to_dataframe(in_records)
+
+        year_df = pd.concat(
+            [regular_df, ex_df, retire_df, in_df],
+            ignore_index=True,
+        )
+        validate_cashflow_dataframe(year_df)
+        cashflow_frames.append(year_df)
+
+        residuals.append(turnover_result.rounding_residual_count)
+        per_year_entries.append(entry_assumptions_resolved.entry_count_per_year)
+        per_year_exits.append(turnover_result.exited_count)
+        per_year_retirements.append(retiring_persons)
+
+        current_state = post_entry
+        states.append(current_state)
+
+    if cashflow_frames:
+        cashflows = pd.concat(cashflow_frames, ignore_index=True)
+    else:
+        cashflows = pd.DataFrame(columns=list(CASHFLOW_COLUMNS))
+    validate_cashflow_dataframe(cashflows)
+
+    return Stage2EngineResult(
+        portfolio_states=tuple(states),
+        cashflows=cashflows,
+        turnover_rounding_residual_count=tuple(residuals),
+        per_year_entries=tuple(per_year_entries),
+        per_year_exits=tuple(per_year_exits),
+        per_year_retirements=tuple(per_year_retirements),
+        salary_growth_rate=salary_growth_rate,
+        turnover_rate=turnover_rate,
+        entry_assumptions=entry_assumptions_resolved,
+    )
+
+
+def _validate_non_bool_int(value: object, name: str) -> int:
+    if isinstance(value, bool):
+        raise TypeError(f"{name} must not be bool")
+    if not isinstance(value, int):
+        raise TypeError(f"{name} must be int, got {type(value).__name__}")
+    return value
+
+
+def _validate_non_bool_real(value: object, name: str) -> float:
+    if isinstance(value, bool):
+        raise TypeError(f"{name} must not be bool")
+    if not isinstance(value, numbers.Real):
+        raise TypeError(f"{name} must be numeric, got {type(value).__name__}")
+    fval = float(value)
+    if math.isnan(fval):
+        raise ValueError(f"{name} must not be NaN")
+    return fval
+
+
+def _validate_float_tuple(value: object, name: str, expected_len: int) -> None:
+    if not isinstance(value, tuple):
+        raise TypeError(f"{name} must be tuple, got {type(value).__name__}")
+    if len(value) != expected_len:
+        raise ValueError(f"{name} length must be {expected_len}, got {len(value)}")
+    for i, item in enumerate(value):
+        fval = _validate_non_bool_real(item, f"{name}[{i}]")
+        if fval < 0:
+            raise ValueError(f"{name}[{i}] must be >= 0, got {fval}")
+
+
+def _validate_int_tuple(value: object, name: str, expected_len: int) -> None:
+    if not isinstance(value, tuple):
+        raise TypeError(f"{name} must be tuple, got {type(value).__name__}")
+    if len(value) != expected_len:
+        raise ValueError(f"{name} length must be {expected_len}, got {len(value)}")
+    for i, item in enumerate(value):
+        ival = _validate_non_bool_int(item, f"{name}[{i}]")
+        if ival < 0:
+            raise ValueError(f"{name}[{i}] must be >= 0, got {ival}")
