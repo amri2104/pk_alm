@@ -31,10 +31,15 @@ tested separately, but it is not a material driver of the default demo output.
 
 Add an actuarial mortality layer after the population skeleton is stable.
 
+Stage 2B uses EK 0105 only as a simplified educational mortality input. It
+must not be presented as a current Swiss pension-fund standard. BVG 2020 /
+VZ 2020 would be more appropriate for real pension-fund valuation, but are
+out of scope for this prototype.
+
 Scope:
 
 - Mortality-table inputs.
-- Retiree decrement logic.
+- Mortality-weighted retiree pension cashflows and retiree present values.
 - Mortality-aware retiree obligation valuation.
 - Explicit assumptions and validation cases.
 
@@ -42,6 +47,7 @@ Guardrails:
 
 - Do not present terminal-age run-off and mortality-table valuation as the same method.
 - Keep mortality assumptions visible and testable.
+- Do not decrement retired cohort counts in portfolio states in the Stage-2B prototype.
 
 ## Stage 2C Salary / Contribution Growth
 
