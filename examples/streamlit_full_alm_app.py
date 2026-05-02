@@ -29,7 +29,6 @@ from pk_alm.workflows.full_alm_workflow import (
 )
 
 DEFAULT_OUTPUT_DIR = Path("outputs/full_alm_streamlit")
-GENERATION_MODES = ("aal", "fallback")
 BENCHMARK_COLUMNS = ("metric", "reference_value", "model_value", "unit", "note")
 
 CSV_DESCRIPTIONS = {
@@ -203,12 +202,7 @@ def main() -> None:
 
     with st.sidebar:
         st.header("Run Settings")
-        generation_mode = st.selectbox(
-            "Generation mode",
-            GENERATION_MODES,
-            index=0,
-            help='Use "fallback" only explicitly for offline comparison.',
-        )
+        st.caption("Asset generation uses the required live AAL/ACTUS path.")
         output_dir_text = st.text_input(
             "Output directory",
             value=st.session_state.get("latest_output_dir", str(DEFAULT_OUTPUT_DIR)),
@@ -237,7 +231,6 @@ def main() -> None:
             try:
                 result = run_full_alm_reporting_workflow(
                     output_dir,
-                    generation_mode=generation_mode,
                     benchmark_reference_values=reference_values,
                     benchmark_model_values=model_values,
                     benchmark_units=units,
@@ -271,10 +264,7 @@ def main() -> None:
         st.subheader("Generated Output Summary")
         st.write(summary)
 
-    st.info(
-        'AAL mode is the strategic asset path. Fallback mode is explicit '
-        "offline/comparison support only; the app does not silently fall back."
-    )
+    st.info("Asset-side ACTUS cashflows use the required live AAL service path.")
 
     if st.session_state.get("workflow_completed"):
         _render_outputs(st, Path(st.session_state["latest_output_dir"]))

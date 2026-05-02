@@ -1,23 +1,24 @@
-"""Tests for the AAL/ACTUS asset portfolio helpers (Sprint 7A.3)."""
+"""Tests for AAL/ACTUS asset portfolio specs and builders."""
 
 import math
 
 import pandas as pd
 import pytest
 
-from pk_alm.adapters.aal_asset_boundary import probe_aal_asset_boundary
 from pk_alm.adapters.aal_asset_portfolio import (
     AALAssetContractSpec,
+    CSHSpec,
     DEFAULT_AAL_ASSET_CONTRACT_SPECS,
-    build_aal_asset_portfolio_fallback_cashflows,
+    PAMSpec,
+    STKSpec,
+    build_aal_cash_contracts_from_specs,
     build_aal_pam_contracts_from_specs,
     build_aal_portfolio_from_specs,
+    build_aal_stk_contracts_from_specs,
     get_default_aal_asset_contract_specs,
     validate_aal_asset_contract_specs,
 )
-from pk_alm.adapters.actus_fixtures import build_fixed_rate_bond_cashflow_dataframe
-from pk_alm.analytics.cashflows import summarize_cashflows_by_year
-from pk_alm.cashflows.schema import CASHFLOW_COLUMNS, validate_cashflow_dataframe
+from pk_alm.adapters.aal_probe import get_aal_module
 from pk_alm.scenarios.stage1_baseline import run_stage1_baseline
 
 
@@ -27,6 +28,22 @@ class _FakePAM:
 
     def to_dict(self):
         return {**self.terms, "contractType": "PAM"}
+
+
+class _FakeSTK:
+    def __init__(self, **terms):
+        self.terms = dict(terms)
+
+    def to_dict(self):
+        return {**self.terms, "contractType": "STK"}
+
+
+class _FakeCSH:
+    def __init__(self, **terms):
+        self.terms = dict(terms)
+
+    def to_dict(self):
+        return {**self.terms, "contractType": "CSH"}
 
 
 class _FakePortfolio:
@@ -42,12 +59,14 @@ class _FakePortfolio:
 
 class _FakeAALModule:
     PAM = _FakePAM
+    STK = _FakeSTK
+    CSH = _FakeCSH
     Portfolio = _FakePortfolio
 
 
-def _custom_specs() -> tuple[AALAssetContractSpec, ...]:
+def _custom_specs():
     return (
-        AALAssetContractSpec(
+        PAMSpec(
             contract_id="CUSTOM_PAM_1",
             start_year=2026,
             maturity_year=2028,
@@ -55,50 +74,79 @@ def _custom_specs() -> tuple[AALAssetContractSpec, ...]:
             coupon_rate=0.02,
             currency="CHF",
         ),
-        AALAssetContractSpec(
-            contract_id="CUSTOM_PAM_2",
-            start_year=2027,
-            maturity_year=2030,
-            nominal_value=250_000.0,
-            coupon_rate=0.035,
+        STKSpec(
+            contract_id="CUSTOM_STK_1",
+            start_year=2026,
+            divestment_year=2030,
+            quantity=1_000.0,
+            price_at_purchase=100.0,
+            price_at_termination=116.985856,
+            currency="CHF",
+            dividend_yield=0.025,
+            market_value_growth=0.04,
+        ),
+        CSHSpec(
+            contract_id="CUSTOM_CSH_1",
+            start_year=2026,
+            nominal_value=50_000.0,
             currency="CHF",
         ),
     )
 
 
-def _skip_if_aal_missing():
-    return pytest.importorskip("awesome_actus_lib")
+def test_compatibility_base_is_not_instantiable():
+    with pytest.raises(TypeError):
+        AALAssetContractSpec()
 
 
-# ---------------------------------------------------------------------------
-# A. Default specs
-# ---------------------------------------------------------------------------
-
-
-def test_default_portfolio_specs_are_non_empty():
+def test_default_portfolio_specs_are_non_empty_and_use_new_spec_types():
     specs = get_default_aal_asset_contract_specs()
     assert specs
     assert specs == DEFAULT_AAL_ASSET_CONTRACT_SPECS
     assert all(isinstance(spec, AALAssetContractSpec) for spec in specs)
+    assert sum(isinstance(spec, PAMSpec) for spec in specs) == 5
+    assert sum(isinstance(spec, STKSpec) for spec in specs) == 3
+    assert sum(isinstance(spec, CSHSpec) for spec in specs) == 1
 
 
-def test_default_portfolio_specs_have_unique_ids_one_currency_and_no_purchase():
+def test_default_portfolio_specs_have_unique_ids_one_currency_and_five_million_total():
     specs = get_default_aal_asset_contract_specs()
     contract_ids = [spec.contract_id for spec in specs]
     assert len(contract_ids) == len(set(contract_ids))
     assert {spec.currency for spec in specs} == {"CHF"}
-    assert all(spec.include_purchase_event is False for spec in specs)
+    total_exposure = sum(spec.nominal_value for spec in specs)
+    assert total_exposure == pytest.approx(5_000_000.0)
 
 
-# ---------------------------------------------------------------------------
-# B. Spec validation
-# ---------------------------------------------------------------------------
+def test_default_stk_quantities_and_terminal_prices_are_precomputed():
+    specs = {
+        spec.contract_id: spec
+        for spec in get_default_aal_asset_contract_specs()
+        if isinstance(spec, STKSpec)
+    }
+    equity = specs["AAL_STK_EQUITY_PROXY"]
+    real_estate = specs["AAL_STK_REAL_ESTATE_PROXY"]
+    alternatives = specs["AAL_STK_ALTERNATIVES_PROXY"]
+
+    assert equity.quantity == pytest.approx(15_500.0)
+    assert real_estate.quantity == pytest.approx(11_500.0)
+    assert alternatives.quantity == pytest.approx(5_000.0)
+    assert equity.price_at_termination == pytest.approx(100.0 * (1.04**12))
+    assert real_estate.price_at_termination == pytest.approx(100.0 * (1.02**12))
+    assert alternatives.price_at_termination == pytest.approx(100.0 * (1.03**12))
+
+
+def test_contract_type_properties():
+    pam, stk, csh = _custom_specs()
+    assert pam.contract_type == "PAM"
+    assert stk.contract_type == "STK"
+    assert csh.contract_type == "CSH"
 
 
 @pytest.mark.parametrize("bad", ["", "   ", None, 123])
 def test_invalid_contract_id_rejected(bad):
     with pytest.raises((TypeError, ValueError)):
-        AALAssetContractSpec(
+        PAMSpec(
             contract_id=bad,
             start_year=2026,
             maturity_year=2028,
@@ -110,87 +158,99 @@ def test_invalid_contract_id_rejected(bad):
 @pytest.mark.parametrize("bad", [True, None, "2026", 1.5])
 def test_invalid_start_year_type_rejected(bad):
     with pytest.raises(TypeError):
-        AALAssetContractSpec(
-            contract_id="BAD",
-            start_year=bad,
-            maturity_year=2028,
-            nominal_value=100_000.0,
-            coupon_rate=0.02,
-        )
+        PAMSpec("BAD", bad, 2028, 100_000.0, 0.02)
 
 
 @pytest.mark.parametrize("maturity_year", [2025, 2026])
-def test_maturity_year_must_be_after_start_year(maturity_year):
+def test_pam_maturity_year_must_be_after_start_year(maturity_year):
     with pytest.raises(ValueError):
-        AALAssetContractSpec(
-            contract_id="BAD",
-            start_year=2026,
-            maturity_year=maturity_year,
-            nominal_value=100_000.0,
-            coupon_rate=0.02,
-        )
+        PAMSpec("BAD", 2026, maturity_year, 100_000.0, 0.02)
 
 
 @pytest.mark.parametrize("bad", [False, None, "2028", 1.5])
 def test_invalid_maturity_year_type_rejected(bad):
     with pytest.raises(TypeError):
-        AALAssetContractSpec(
-            contract_id="BAD",
-            start_year=2026,
-            maturity_year=bad,
-            nominal_value=100_000.0,
-            coupon_rate=0.02,
-        )
+        PAMSpec("BAD", 2026, bad, 100_000.0, 0.02)
 
 
 @pytest.mark.parametrize("bad", [True, None, "100000", math.nan, 0.0, -1.0])
 def test_invalid_nominal_value_rejected(bad):
     with pytest.raises((TypeError, ValueError)):
-        AALAssetContractSpec(
-            contract_id="BAD",
-            start_year=2026,
-            maturity_year=2028,
-            nominal_value=bad,
-            coupon_rate=0.02,
-        )
+        PAMSpec("BAD", 2026, 2028, bad, 0.02)
 
 
 @pytest.mark.parametrize("bad", [False, None, "0.02", math.nan, -0.01])
 def test_invalid_coupon_rate_rejected(bad):
     with pytest.raises((TypeError, ValueError)):
-        AALAssetContractSpec(
-            contract_id="BAD",
-            start_year=2026,
-            maturity_year=2028,
-            nominal_value=100_000.0,
-            coupon_rate=bad,
-        )
+        PAMSpec("BAD", 2026, 2028, 100_000.0, bad)
 
 
-@pytest.mark.parametrize("bad", ["", "   ", None, 123])
+@pytest.mark.parametrize("bad", ["", "   ", None, 123, "chf", "CH", "CH1"])
 def test_invalid_currency_rejected(bad):
     with pytest.raises((TypeError, ValueError)):
-        AALAssetContractSpec(
-            contract_id="BAD",
-            start_year=2026,
-            maturity_year=2028,
-            nominal_value=100_000.0,
-            coupon_rate=0.02,
-            currency=bad,
-        )
+        PAMSpec("BAD", 2026, 2028, 100_000.0, 0.02, currency=bad)
 
 
-@pytest.mark.parametrize("bad", [None, 0, 1, "True"])
-def test_invalid_include_purchase_event_rejected(bad):
-    with pytest.raises(TypeError):
-        AALAssetContractSpec(
-            contract_id="BAD",
-            start_year=2026,
-            maturity_year=2028,
-            nominal_value=100_000.0,
-            coupon_rate=0.02,
-            include_purchase_event=bad,
-        )
+def test_stk_validation_and_nominal_value_property():
+    spec = STKSpec(
+        "STK",
+        2026,
+        2030,
+        quantity=1_500.0,
+        price_at_purchase=100.0,
+        price_at_termination=120.0,
+        dividend_yield=0.02,
+        market_value_growth=0.03,
+    )
+    assert spec.nominal_value == pytest.approx(150_000.0)
+
+
+@pytest.mark.parametrize("divestment_year", [2025, 2026])
+def test_stk_divestment_year_must_be_after_start_year(divestment_year):
+    with pytest.raises(ValueError):
+        STKSpec("BAD", 2026, divestment_year, 1.0, 100.0, 100.0)
+
+
+@pytest.mark.parametrize(
+    "field,bad",
+    [
+        ("quantity", 0.0),
+        ("quantity", -1.0),
+        ("price_at_purchase", 0.0),
+        ("price_at_purchase", -1.0),
+        ("price_at_termination", 0.0),
+        ("price_at_termination", -1.0),
+        ("dividend_yield", -0.01),
+        ("market_value_growth", -1.0),
+        ("market_value_growth", math.nan),
+    ],
+)
+def test_invalid_stk_numeric_fields_rejected(field, bad):
+    kwargs = {
+        "contract_id": "BAD",
+        "start_year": 2026,
+        "divestment_year": 2030,
+        "quantity": 1_000.0,
+        "price_at_purchase": 100.0,
+        "price_at_termination": 110.0,
+        "dividend_yield": 0.0,
+        "market_value_growth": 0.02,
+    }
+    kwargs[field] = bad
+    with pytest.raises((TypeError, ValueError)):
+        STKSpec(**kwargs)
+
+
+@pytest.mark.parametrize("bad", [0.0, -1.0, math.nan, "1000"])
+def test_invalid_csh_nominal_value_rejected(bad):
+    with pytest.raises((TypeError, ValueError)):
+        CSHSpec("BAD", 2026, bad)
+
+
+@pytest.mark.parametrize("bad", [-0.01, math.nan, "0.01"])
+def test_invalid_csh_assumed_return_rejected(bad):
+    with pytest.raises((TypeError, ValueError)):
+        CSHSpec("BAD", 2026, 100_000.0, assumed_return=bad)
 
 
 def test_empty_portfolio_specs_rejected():
@@ -203,12 +263,12 @@ def test_non_spec_item_rejected():
         validate_aal_asset_contract_specs([_custom_specs()[0], "not a spec"])
 
 
-def test_duplicate_contract_ids_rejected():
+def test_duplicate_contract_ids_rejected_across_types():
     with pytest.raises(ValueError):
         validate_aal_asset_contract_specs(
             [
-                AALAssetContractSpec("DUP", 2026, 2028, 100_000.0, 0.02),
-                AALAssetContractSpec("DUP", 2027, 2029, 200_000.0, 0.03),
+                PAMSpec("DUP", 2026, 2028, 100_000.0, 0.02),
+                CSHSpec("DUP", 2026, 50_000.0),
             ]
         )
 
@@ -217,193 +277,85 @@ def test_mixed_currency_rejected_for_stage1_portfolio_analytics():
     with pytest.raises(ValueError):
         validate_aal_asset_contract_specs(
             [
-                AALAssetContractSpec("CHF_PAM", 2026, 2028, 100_000.0, 0.02),
-                AALAssetContractSpec(
-                    "EUR_PAM",
-                    2026,
-                    2029,
-                    100_000.0,
-                    0.02,
-                    currency="EUR",
-                ),
+                PAMSpec("CHF_PAM", 2026, 2028, 100_000.0, 0.02),
+                CSHSpec("EUR_CSH", 2026, 50_000.0, currency="EUR"),
             ]
         )
 
 
-# ---------------------------------------------------------------------------
-# C. Fallback cashflows
-# ---------------------------------------------------------------------------
-
-
-def test_fallback_portfolio_cashflows_validate_with_schema():
-    df = build_aal_asset_portfolio_fallback_cashflows()
-    assert isinstance(df, pd.DataFrame)
-    assert list(df.columns) == list(CASHFLOW_COLUMNS)
-    assert validate_cashflow_dataframe(df) is True
-
-
-def test_fallback_portfolio_cashflows_source_is_always_actus():
-    df = build_aal_asset_portfolio_fallback_cashflows()
-    assert not df.empty
-    assert (df["source"] == "ACTUS").all()
-
-
-def test_fallback_portfolio_cashflows_have_multiple_contract_ids():
-    specs = get_default_aal_asset_contract_specs()
-    df = build_aal_asset_portfolio_fallback_cashflows(specs)
-    assert set(df["contractId"]) == {spec.contract_id for spec in specs}
-
-
-def test_fallback_portfolio_row_count_equals_sum_of_individual_contract_rows():
-    specs = _custom_specs()
-    portfolio = build_aal_asset_portfolio_fallback_cashflows(specs)
-    expected = sum(
-        len(
-            build_fixed_rate_bond_cashflow_dataframe(
-                contract_id=spec.contract_id,
-                start_year=spec.start_year,
-                maturity_year=spec.maturity_year,
-                nominal_value=spec.nominal_value,
-                annual_coupon_rate=spec.coupon_rate,
-                currency=spec.currency,
-                include_purchase_event=spec.include_purchase_event,
-            )
-        )
-        for spec in specs
-    )
-    assert len(portfolio) == expected
-
-
-def test_annual_cashflow_summary_is_not_empty_and_consistent():
-    specs = _custom_specs()
-    portfolio = build_aal_asset_portfolio_fallback_cashflows(specs)
-    annual = summarize_cashflows_by_year(portfolio)
-    assert not annual.empty
-
-    expected_by_year: dict[int, float] = {}
-    for spec in specs:
-        df = build_fixed_rate_bond_cashflow_dataframe(
-            contract_id=spec.contract_id,
-            start_year=spec.start_year,
-            maturity_year=spec.maturity_year,
-            nominal_value=spec.nominal_value,
-            annual_coupon_rate=spec.coupon_rate,
-            currency=spec.currency,
-            include_purchase_event=spec.include_purchase_event,
-        )
-        individual_annual = summarize_cashflows_by_year(df)
-        for _, row in individual_annual.iterrows():
-            year = int(row["reporting_year"])
-            expected_by_year[year] = expected_by_year.get(year, 0.0) + float(
-                row["net_cashflow"]
-            )
-
-    actual_by_year = {
-        int(row["reporting_year"]): float(row["net_cashflow"])
-        for _, row in annual.iterrows()
-    }
-    assert actual_by_year == pytest.approx(expected_by_year)
-
-
-def test_include_purchase_event_true_produces_ied_outflow():
-    spec = AALAssetContractSpec(
-        contract_id="PURCHASED_PAM",
-        start_year=2026,
-        maturity_year=2028,
-        nominal_value=50_000.0,
-        coupon_rate=0.02,
-        include_purchase_event=True,
-    )
-    df = build_aal_asset_portfolio_fallback_cashflows([spec])
-    ied = df[df["type"] == "IED"]
-    assert len(ied) == 1
-    assert ied.iloc[0]["payoff"] == pytest.approx(-50_000.0)
-    assert ied.iloc[0]["contractId"] == "PURCHASED_PAM"
-
-
-# ---------------------------------------------------------------------------
-# D. AAL object construction
-# ---------------------------------------------------------------------------
-
-
-def test_dynamic_aal_terms_are_mapped_from_specs_with_fake_module():
-    specs = _custom_specs()
-    contracts = build_aal_pam_contracts_from_specs(_FakeAALModule, specs)
+def test_pam_terms_are_mapped_from_specs_with_fake_module():
+    contracts = build_aal_pam_contracts_from_specs(_FakeAALModule, _custom_specs())
     terms = [contract.to_dict() for contract in contracts]
 
-    assert [term["contractID"] for term in terms] == ["CUSTOM_PAM_1", "CUSTOM_PAM_2"]
-    assert [term["contractDealDate"] for term in terms] == [
-        "2026-01-01T00:00:00",
-        "2027-01-01T00:00:00",
-    ]
-    assert [term["initialExchangeDate"] for term in terms] == [
-        "2026-01-01T00:00:00",
-        "2027-01-01T00:00:00",
-    ]
-    assert [term["statusDate"] for term in terms] == [
-        "2026-01-01T00:00:00",
-        "2027-01-01T00:00:00",
-    ]
-    assert [term["maturityDate"] for term in terms] == [
-        "2028-12-31T00:00:00",
-        "2030-12-31T00:00:00",
-    ]
-    assert [term["notionalPrincipal"] for term in terms] == [100_000.0, 250_000.0]
-    assert [term["nominalInterestRate"] for term in terms] == [0.02, 0.035]
-    assert [term["currency"] for term in terms] == ["CHF", "CHF"]
+    assert len(terms) == 1
+    assert terms[0]["contractID"] == "CUSTOM_PAM_1"
+    assert terms[0]["contractDealDate"] == "2026-01-01T00:00:00"
+    assert terms[0]["initialExchangeDate"] == "2026-01-01T00:00:00"
+    assert terms[0]["statusDate"] == "2026-01-01T00:00:00"
+    assert terms[0]["maturityDate"] == "2028-12-31T00:00:00"
+    assert terms[0]["notionalPrincipal"] == 100_000.0
+    assert terms[0]["nominalInterestRate"] == 0.02
+    assert terms[0]["cycleOfInterestPayment"] == "P1YL1"
+    assert terms[0]["cycleAnchorDateOfInterestPayment"] == "2027-01-01T00:00:00"
+    assert terms[0]["currency"] == "CHF"
 
 
-def test_aal_portfolio_can_be_constructed_with_fake_module():
-    specs = _custom_specs()
-    portfolio = build_aal_portfolio_from_specs(_FakeAALModule, specs)
-    assert len(portfolio) == 2
+def test_stk_and_cash_contracts_are_mapped_from_specs_with_fake_module():
+    stk_contracts = build_aal_stk_contracts_from_specs(_FakeAALModule, _custom_specs())
+    cash_contracts = build_aal_cash_contracts_from_specs(_FakeAALModule, _custom_specs())
+
+    stk_terms = stk_contracts[0].to_dict()
+    cash_terms = cash_contracts[0].to_dict()
+
+    assert stk_terms["contractID"] == "CUSTOM_STK_1"
+    assert stk_terms["contractType"] == "STK"
+    assert stk_terms["terminationDate"] == "2030-12-31T00:00:00"
+    assert stk_terms["priceAtTerminationDate"] == pytest.approx(116.985856)
+    assert stk_terms["cycleOfDividend"] == "P1YL1"
+    assert cash_terms["contractID"] == "CUSTOM_CSH_1"
+    assert cash_terms["contractType"] == "CSH"
+    assert cash_terms["notionalPrincipal"] == 50_000.0
+
+
+def test_aal_portfolio_can_be_constructed_with_fake_module_from_pam_subset():
+    portfolio = build_aal_portfolio_from_specs(_FakeAALModule, _custom_specs())
+    assert len(portfolio) == 3
     assert [term["contractID"] for term in portfolio.to_dict()] == [
         "CUSTOM_PAM_1",
-        "CUSTOM_PAM_2",
+        "CUSTOM_STK_1",
+        "CUSTOM_CSH_1",
     ]
 
 
-def test_multiple_pam_contracts_can_be_constructed_if_aal_installed():
-    module = _skip_if_aal_missing()
-    contracts = build_aal_pam_contracts_from_specs(module, _custom_specs())
-    assert len(contracts) == 2
-    assert [contract.to_dict()["contractID"] for contract in contracts] == [
+def test_real_aal_contracts_can_be_constructed_from_specs():
+    module = get_aal_module()
+    specs = _custom_specs()
+    pam_contracts = build_aal_pam_contracts_from_specs(module, specs)
+    stk_contracts = build_aal_stk_contracts_from_specs(module, specs)
+    cash_contracts = build_aal_cash_contracts_from_specs(module, specs)
+    assert [contract.to_dict()["contractID"] for contract in pam_contracts] == [
         "CUSTOM_PAM_1",
-        "CUSTOM_PAM_2",
+    ]
+    assert [contract.to_dict()["contractID"] for contract in stk_contracts] == [
+        "CUSTOM_STK_1",
+    ]
+    assert [contract.to_dict()["contractID"] for contract in cash_contracts] == [
+        "CUSTOM_CSH_1",
     ]
 
 
-def test_aal_portfolio_can_be_constructed_from_specs_if_aal_installed():
-    module = _skip_if_aal_missing()
+def test_real_aal_portfolio_can_be_constructed_from_pam_subset():
+    module = get_aal_module()
     portfolio = build_aal_portfolio_from_specs(module, _custom_specs())
-    assert len(portfolio) == 2
+    assert len(portfolio) == 3
 
 
-# ---------------------------------------------------------------------------
-# E. No network / Stage-1 no-side-effect
-# ---------------------------------------------------------------------------
-
-
-def test_no_service_generation_attempted_by_default():
-    probe = probe_aal_asset_boundary()
-    assert probe.service_generation_attempted is False
-
-
-def test_asset_portfolio_helpers_do_not_change_stage1_baseline_outputs():
+def test_stage1_baseline_unchanged_by_portfolio_construction():
     before = run_stage1_baseline(output_dir=None)
-
-    build_aal_asset_portfolio_fallback_cashflows()
-    build_aal_pam_contracts_from_specs(_FakeAALModule)
-    build_aal_portfolio_from_specs(_FakeAALModule)
-
+    module = get_aal_module()
+    build_aal_portfolio_from_specs(module, _custom_specs())
     after = run_stage1_baseline(output_dir=None)
 
-    pd.testing.assert_frame_equal(
-        before.engine_result.cashflows,
-        after.engine_result.cashflows,
-    )
+    assert before.engine_result.portfolio_states == after.engine_result.portfolio_states
+    pd.testing.assert_frame_equal(before.engine_result.cashflows, after.engine_result.cashflows)
     pd.testing.assert_frame_equal(before.annual_cashflows, after.annual_cashflows)
-    pd.testing.assert_frame_equal(
-        before.funding_ratio_trajectory,
-        after.funding_ratio_trajectory,
-    )

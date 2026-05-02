@@ -79,7 +79,7 @@ Guardrails:
 
 - Do not replace the deterministic Stage-1 baseline.
 - Do not silently mix deterministic and stochastic outputs.
-- Keep AAL/fallback mode explicit.
+- Keep Stage-1 reference outputs separate from live AAL Full ALM outputs.
 
 ## Stage 2E Going-Concern Strategy Layer
 

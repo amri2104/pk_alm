@@ -12,9 +12,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import pandas as pd
 
+from pk_alm.adapters.aal_asset_portfolio import AssetSpec
 from pk_alm.analytics.cashflows import (
     find_liquidity_inflection_year,
     summarize_cashflows_by_year,
@@ -30,9 +32,13 @@ from pk_alm.analytics.funding_summary import (
     validate_funding_summary_dataframe,
 )
 from pk_alm.assets.deterministic import (
+    DeterministicAssetSnapshot,
+    asset_snapshots_to_dataframe,
     build_deterministic_asset_trajectory,
     validate_asset_dataframe,
 )
+from pk_alm.assets.aal_engine import run_aal_asset_engine
+from pk_alm.assets.actus_trajectory import compute_actus_asset_trajectory
 from pk_alm.bvg.cohorts import ActiveCohort, RetiredCohort
 from pk_alm.bvg.engine import BVGEngineResult, run_bvg_engine
 from pk_alm.bvg.portfolio import BVGPortfolioState
@@ -47,6 +53,12 @@ from pk_alm.scenarios.result_summary import (
     validate_scenario_result_dataframe,
 )
 
+AssetMode = Literal["deterministic", "actus"]
+ASSET_MODE_DETERMINISTIC = "deterministic"
+ASSET_MODE_ACTUS = "actus"
+ACTUS_ASSET_TRAJECTORY_FILENAME = "actus_asset_trajectory.csv"
+_CASHFLOW_SORT_COLUMNS = ["time", "source", "contractId", "type"]
+
 
 # ---------------------------------------------------------------------------
 # Result container
@@ -59,6 +71,7 @@ class Stage1BaselineResult:
 
     initial_state: BVGPortfolioState
     engine_result: BVGEngineResult
+    cashflows: pd.DataFrame
     valuation_snapshots: pd.DataFrame
     annual_cashflows: pd.DataFrame
     asset_snapshots: pd.DataFrame
@@ -68,6 +81,7 @@ class Stage1BaselineResult:
     liquidity_inflection_year_structural: int | None
     liquidity_inflection_year_net: int | None
     output_paths: dict[str, Path]
+    actus_asset_trajectory: pd.DataFrame | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.initial_state, BVGPortfolioState):
@@ -80,6 +94,12 @@ class Stage1BaselineResult:
                 f"engine_result must be BVGEngineResult, "
                 f"got {type(self.engine_result).__name__}"
             )
+        if not isinstance(self.cashflows, pd.DataFrame):
+            raise TypeError(
+                f"cashflows must be a pandas DataFrame, "
+                f"got {type(self.cashflows).__name__}"
+            )
+        validate_cashflow_dataframe(self.cashflows)
         if not isinstance(self.valuation_snapshots, pd.DataFrame):
             raise TypeError(
                 f"valuation_snapshots must be a pandas DataFrame, "
@@ -151,6 +171,10 @@ class Stage1BaselineResult:
                 raise TypeError(
                     f"output_paths[{k!r}] must be Path, got {type(v).__name__}"
                 )
+        if self.actus_asset_trajectory is not None and not isinstance(
+            self.actus_asset_trajectory, pd.DataFrame
+        ):
+            raise TypeError("actus_asset_trajectory must be DataFrame or None")
 
 
 # ---------------------------------------------------------------------------
@@ -197,6 +221,197 @@ def build_default_stage1_portfolio() -> BVGPortfolioState:
 # ---------------------------------------------------------------------------
 
 
+def _validate_asset_mode(asset_mode: str) -> AssetMode:
+    if asset_mode not in (ASSET_MODE_DETERMINISTIC, ASSET_MODE_ACTUS):
+        raise ValueError("asset_mode must be 'deterministic' or 'actus'")
+    return asset_mode  # type: ignore[return-value]
+
+
+def _resolve_output_dir(
+    *,
+    asset_mode: AssetMode,
+    output_dir: str | Path | None,
+    deterministic_default: str,
+    actus_default: str,
+) -> str | Path | None:
+    if output_dir is None:
+        return None
+    if (
+        asset_mode == ASSET_MODE_ACTUS
+        and str(output_dir) == deterministic_default
+    ):
+        return actus_default
+    return output_dir
+
+
+def _filter_cashflows_to_projection_window(
+    cashflows: pd.DataFrame,
+    *,
+    start_year: int,
+    horizon_years: int,
+) -> pd.DataFrame:
+    if cashflows.empty:
+        return cashflows.copy(deep=True)
+    end_year = start_year + horizon_years - 1
+    years = pd.to_datetime(cashflows["time"]).dt.year.astype(int)
+    filtered = cashflows.loc[
+        (years >= start_year) & (years <= end_year)
+    ].copy(deep=True)
+    return filtered.reset_index(drop=True)
+
+
+def _combine_cashflows(
+    liability_cashflows: pd.DataFrame,
+    asset_cashflows: pd.DataFrame,
+    *,
+    start_year: int,
+    horizon_years: int,
+) -> pd.DataFrame:
+    filtered_asset_cashflows = _filter_cashflows_to_projection_window(
+        asset_cashflows,
+        start_year=start_year,
+        horizon_years=horizon_years,
+    )
+    combined = pd.concat(
+        [liability_cashflows, filtered_asset_cashflows],
+        ignore_index=True,
+    )
+    if not combined.empty:
+        combined = combined.sort_values(_CASHFLOW_SORT_COLUMNS, ignore_index=True)
+    validate_cashflow_dataframe(combined)
+    return combined
+
+
+def _liability_net_cashflow_by_projection_year(
+    liability_cashflows: pd.DataFrame,
+    *,
+    start_year: int,
+    horizon_years: int,
+) -> dict[int, float]:
+    if horizon_years == 0:
+        return {}
+    annual_liability = summarize_cashflows_by_year(liability_cashflows)
+    return {
+        projection_year: float(
+            annual_liability.loc[
+                annual_liability["reporting_year"] == start_year + projection_year - 1,
+                "net_cashflow",
+            ].sum()
+        )
+        for projection_year in range(1, horizon_years + 1)
+    }
+
+
+def _asset_snapshots_from_actus_trajectory(
+    actus_asset_trajectory: pd.DataFrame,
+    liability_cashflows: pd.DataFrame,
+    *,
+    start_year: int,
+    horizon_years: int,
+    currency: str = "CHF",
+) -> pd.DataFrame:
+    liability_net = _liability_net_cashflow_by_projection_year(
+        liability_cashflows,
+        start_year=start_year,
+        horizon_years=horizon_years,
+    )
+    bvg_cumulative = 0.0
+    closing_values: list[float] = []
+    for projection_year in range(horizon_years + 1):
+        if projection_year > 0:
+            bvg_cumulative += liability_net.get(projection_year, 0.0)
+        base_closing = float(
+            actus_asset_trajectory.iloc[projection_year]["closing_asset_value"]
+        )
+        closing_values.append(base_closing + bvg_cumulative)
+
+    snapshots = [
+        DeterministicAssetSnapshot(
+            projection_year=0,
+            opening_asset_value=closing_values[0],
+            investment_return=0.0,
+            net_cashflow=0.0,
+            closing_asset_value=closing_values[0],
+            annual_return_rate=0.0,
+            currency=currency,
+        )
+    ]
+    for projection_year in range(1, horizon_years + 1):
+        opening = closing_values[projection_year - 1]
+        closing = closing_values[projection_year]
+        snapshots.append(
+            DeterministicAssetSnapshot(
+                projection_year=projection_year,
+                opening_asset_value=opening,
+                investment_return=0.0,
+                net_cashflow=closing - opening,
+                closing_asset_value=closing,
+                annual_return_rate=0.0,
+                currency=currency,
+            )
+        )
+    df = asset_snapshots_to_dataframe(snapshots)
+    validate_asset_dataframe(df)
+    return df
+
+
+def _build_actus_mode_outputs(
+    *,
+    valuation_snapshots: pd.DataFrame,
+    liability_cashflows: pd.DataFrame,
+    asset_specs: tuple[AssetSpec, ...] | list[AssetSpec] | None,
+    target_funding_ratio: float,
+    start_year: int,
+    horizon_years: int,
+    initial_liability: float | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    asset_result = run_aal_asset_engine(
+        asset_specs,
+        horizon_years=horizon_years,
+    )
+    liability_for_calibration = (
+        float(valuation_snapshots.iloc[0]["total_stage1_liability"])
+        if initial_liability is None
+        else float(initial_liability)
+    )
+    target_assets = liability_for_calibration * target_funding_ratio
+    zero_cash_trajectory = compute_actus_asset_trajectory(
+        asset_result.contracts,
+        asset_result.cashflows,
+        horizon_years,
+        initial_cash=0.0,
+    )
+    initial_cash = target_assets - float(
+        zero_cash_trajectory.iloc[0]["closing_asset_value"]
+    )
+    actus_asset_trajectory = compute_actus_asset_trajectory(
+        asset_result.contracts,
+        asset_result.cashflows,
+        horizon_years,
+        initial_cash=initial_cash,
+    )
+    combined_cashflows = _combine_cashflows(
+        liability_cashflows,
+        asset_result.cashflows,
+        start_year=start_year,
+        horizon_years=horizon_years,
+    )
+    annual_cashflows = summarize_cashflows_by_year(combined_cashflows)
+    validate_annual_cashflow_dataframe(annual_cashflows)
+    asset_snapshots = _asset_snapshots_from_actus_trajectory(
+        actus_asset_trajectory,
+        liability_cashflows,
+        start_year=start_year,
+        horizon_years=horizon_years,
+    )
+    return (
+        combined_cashflows,
+        annual_cashflows,
+        asset_snapshots,
+        actus_asset_trajectory,
+    )
+
+
 def run_stage1_baseline(
     *,
     scenario_id: str = "stage1_baseline",
@@ -212,9 +427,18 @@ def run_stage1_baseline(
     valuation_terminal_age: int = 90,
     target_funding_ratio: float = 1.076,
     annual_asset_return: float = 0.0,
-    output_dir: str | Path | None = None,
+    asset_mode: AssetMode = ASSET_MODE_DETERMINISTIC,
+    asset_specs: tuple[AssetSpec, ...] | list[AssetSpec] | None = None,
+    output_dir: str | Path | None = "outputs/stage1_baseline",
 ) -> Stage1BaselineResult:
     """Run the Stage-1 baseline scenario end-to-end and optionally export CSVs."""
+    resolved_asset_mode = _validate_asset_mode(asset_mode)
+    output_dir = _resolve_output_dir(
+        asset_mode=resolved_asset_mode,
+        output_dir=output_dir,
+        deterministic_default="outputs/stage1_baseline",
+        actus_default="outputs/stage1_actus",
+    )
     initial_state = build_default_stage1_portfolio()
 
     engine_result = run_bvg_engine(
@@ -237,16 +461,32 @@ def run_stage1_baseline(
     )
     validate_valuation_dataframe(valuation_snapshots)
 
-    annual_cashflows = summarize_cashflows_by_year(engine_result.cashflows)
-    validate_annual_cashflow_dataframe(annual_cashflows)
-
-    asset_snapshots = build_deterministic_asset_trajectory(
-        valuation_snapshots,
-        annual_cashflows,
-        target_funding_ratio=target_funding_ratio,
-        annual_return_rate=annual_asset_return,
-        start_year=start_year,
-    )
+    if resolved_asset_mode == ASSET_MODE_DETERMINISTIC:
+        cashflows = engine_result.cashflows.copy(deep=True)
+        annual_cashflows = summarize_cashflows_by_year(cashflows)
+        validate_annual_cashflow_dataframe(annual_cashflows)
+        asset_snapshots = build_deterministic_asset_trajectory(
+            valuation_snapshots,
+            annual_cashflows,
+            target_funding_ratio=target_funding_ratio,
+            annual_return_rate=annual_asset_return,
+            start_year=start_year,
+        )
+        actus_asset_trajectory = None
+    else:
+        (
+            cashflows,
+            annual_cashflows,
+            asset_snapshots,
+            actus_asset_trajectory,
+        ) = _build_actus_mode_outputs(
+            valuation_snapshots=valuation_snapshots,
+            liability_cashflows=engine_result.cashflows,
+            asset_specs=asset_specs,
+            target_funding_ratio=target_funding_ratio,
+            start_year=start_year,
+            horizon_years=horizon_years,
+        )
     validate_asset_dataframe(asset_snapshots)
 
     funding_ratio_trajectory = build_funding_ratio_trajectory(
@@ -296,6 +536,8 @@ def run_stage1_baseline(
         scenario_summary_path = out_path / "scenario_summary.csv"
 
         engine_result.cashflows.to_csv(cashflows_path, index=False)
+        if resolved_asset_mode == ASSET_MODE_ACTUS:
+            cashflows.to_csv(cashflows_path, index=False)
         valuation_snapshots.to_csv(valuation_path, index=False)
         annual_cashflows.to_csv(annual_path, index=False)
         asset_snapshots.to_csv(asset_path, index=False)
@@ -312,10 +554,15 @@ def run_stage1_baseline(
             "funding_summary": funding_summary_path,
             "scenario_summary": scenario_summary_path,
         }
+        if actus_asset_trajectory is not None:
+            actus_path = out_path / ACTUS_ASSET_TRAJECTORY_FILENAME
+            actus_asset_trajectory.to_csv(actus_path, index=False)
+            output_paths["actus_asset_trajectory"] = actus_path
 
     return Stage1BaselineResult(
         initial_state=initial_state,
         engine_result=engine_result,
+        cashflows=cashflows,
         valuation_snapshots=valuation_snapshots,
         annual_cashflows=annual_cashflows,
         asset_snapshots=asset_snapshots,
@@ -325,4 +572,5 @@ def run_stage1_baseline(
         liquidity_inflection_year_structural=inflection_structural,
         liquidity_inflection_year_net=inflection_net,
         output_paths=output_paths,
+        actus_asset_trajectory=actus_asset_trajectory,
     )

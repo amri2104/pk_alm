@@ -1,8 +1,10 @@
-"""Deterministic Stage-1 asset baseline.
+"""Zero-asset-return reference baseline for the protected Stage-1 scenario.
 
 This module intentionally stays small: it calibrates opening assets from the
 liability proxy and rolls assets forward with one deterministic return rate
-and annual net cashflows.
+and annual net cashflows. It is not an AAL substitute; it is the transparent
+reference asset roll-forward used by the protected deterministic Stage-1
+baseline.
 """
 
 from __future__ import annotations

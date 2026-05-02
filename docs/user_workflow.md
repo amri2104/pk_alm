@@ -11,10 +11,8 @@ From an installed or editable local checkout:
 python examples/full_alm_reporting_workflow.py
 ```
 
-The example writes to `outputs/full_alm_scenario/` and uses
-`generation_mode="fallback"` explicitly so it can run offline. The strategic
-main asset path remains `generation_mode="aal"` when AAL and its service path
-are available.
+The example writes to `outputs/full_alm_scenario/` and uses the required live
+AAL/ACTUS service-backed asset path.
 
 ## Review Outputs
 
@@ -38,6 +36,5 @@ pip install -e ".[app]"
 python3 -m streamlit run examples/streamlit_full_alm_app.py
 ```
 
-Use `pip install -e ".[app,aal]"` when the UI should run the AAL asset-engine
-path. The prototype writes to `outputs/full_alm_streamlit/` by default and is
-only a UI layer over the existing workflow.
+The prototype writes to `outputs/full_alm_streamlit/` by default and is only a
+UI layer over the existing workflow.

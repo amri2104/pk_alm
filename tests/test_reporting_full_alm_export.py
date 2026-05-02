@@ -1,6 +1,5 @@
 """Tests for Sprint 8 Full ALM reporting exports."""
 
-import inspect
 import os
 from pathlib import Path
 
@@ -30,8 +29,8 @@ _PYPROJECT = _REPO_ROOT / "pyproject.toml"
 
 
 @pytest.fixture()
-def fallback_scenario():
-    return run_full_alm_scenario(generation_mode="fallback")
+def full_alm_scenario():
+    return run_full_alm_scenario()
 
 
 def _read_exported_csvs(result: FullALMExportResult) -> dict[str, pd.DataFrame]:
@@ -44,31 +43,31 @@ def _read_exported_csvs(result: FullALMExportResult) -> dict[str, pd.DataFrame]:
 def test_export_full_alm_result_exports_precomputed_result_without_rerun(
     tmp_path,
     monkeypatch,
-    fallback_scenario,
+    full_alm_scenario,
 ):
     def fail_if_called(**kwargs):
         raise AssertionError(f"scenario runner should not be called: {kwargs}")
 
     monkeypatch.setattr(full_alm_export, "run_full_alm_scenario", fail_if_called)
 
-    result = export_full_alm_result(fallback_scenario, tmp_path)
+    result = export_full_alm_result(full_alm_scenario, tmp_path)
 
     assert isinstance(result, FullALMExportResult)
-    assert result.scenario_result is fallback_scenario
+    assert result.scenario_result is full_alm_scenario
     assert result.output_dir == tmp_path.resolve()
     assert set(result.output_paths) == set(FULL_ALM_EXPORT_FILENAMES)
 
 
-def test_export_full_alm_results_wrapper_default_generation_mode_is_aal(
+def test_export_full_alm_results_wrapper_calls_scenario_with_kwargs(
     tmp_path,
     monkeypatch,
-    fallback_scenario,
+    full_alm_scenario,
 ):
     calls = []
 
-    def fake_run_full_alm_scenario(*, generation_mode="aal", **scenario_kwargs):
-        calls.append((generation_mode, scenario_kwargs))
-        return fallback_scenario
+    def fake_run_full_alm_scenario(**scenario_kwargs):
+        calls.append(scenario_kwargs)
+        return full_alm_scenario
 
     monkeypatch.setattr(
         full_alm_export,
@@ -78,21 +77,19 @@ def test_export_full_alm_results_wrapper_default_generation_mode_is_aal(
 
     export_full_alm_results(tmp_path)
 
-    assert calls == [("aal", {})]
-    sig = inspect.signature(export_full_alm_results)
-    assert sig.parameters["generation_mode"].default == "aal"
+    assert calls == [{}]
 
 
-def test_export_full_alm_results_passes_explicit_fallback_and_kwargs(
+def test_export_full_alm_results_passes_scenario_kwargs(
     tmp_path,
     monkeypatch,
-    fallback_scenario,
+    full_alm_scenario,
 ):
     calls = []
 
-    def fake_run_full_alm_scenario(*, generation_mode="aal", **scenario_kwargs):
-        calls.append((generation_mode, scenario_kwargs))
-        return fallback_scenario
+    def fake_run_full_alm_scenario(**scenario_kwargs):
+        calls.append(scenario_kwargs)
+        return full_alm_scenario
 
     monkeypatch.setattr(
         full_alm_export,
@@ -102,38 +99,29 @@ def test_export_full_alm_results_passes_explicit_fallback_and_kwargs(
 
     export_full_alm_results(
         tmp_path,
-        generation_mode="fallback",
         scenario_id="reporting_test",
         horizon_years=3,
     )
 
-    assert calls == [
-        ("fallback", {"scenario_id": "reporting_test", "horizon_years": 3})
-    ]
+    assert calls == [{"scenario_id": "reporting_test", "horizon_years": 3}]
 
 
-def test_export_functions_reject_protected_stage1_output_targets(
-    fallback_scenario,
-):
+def test_export_functions_reject_protected_stage1_output_targets(full_alm_scenario):
     with pytest.raises(ValueError):
-        export_full_alm_result(fallback_scenario, _PROTECTED_OUTPUTS_DIR)
+        export_full_alm_result(full_alm_scenario, _PROTECTED_OUTPUTS_DIR)
 
     with pytest.raises(ValueError):
-        export_full_alm_result(fallback_scenario, _PROTECTED_OUTPUTS_DIR / "child")
+        export_full_alm_result(full_alm_scenario, _PROTECTED_OUTPUTS_DIR / "child")
 
     with pytest.raises(ValueError):
-        export_full_alm_results(_PROTECTED_OUTPUTS_DIR, generation_mode="fallback")
+        export_full_alm_results(_PROTECTED_OUTPUTS_DIR)
 
     with pytest.raises(ValueError):
-        export_full_alm_results(
-            _PROTECTED_OUTPUTS_DIR / "child",
-            generation_mode="fallback",
-        )
+        export_full_alm_results(_PROTECTED_OUTPUTS_DIR / "child")
 
 
-def test_aal_failures_propagate_without_silent_fallback(tmp_path, monkeypatch):
-    def raise_import_error(*, generation_mode="aal", **scenario_kwargs):
-        assert generation_mode == "aal"
+def test_aal_failures_propagate(tmp_path, monkeypatch):
+    def raise_import_error(**scenario_kwargs):
         raise ImportError("simulated missing AAL")
 
     monkeypatch.setattr(
@@ -150,9 +138,9 @@ def test_aal_failures_propagate_without_silent_fallback(tmp_path, monkeypatch):
 
 def test_exported_csvs_exist_are_readable_and_have_stable_columns(
     tmp_path,
-    fallback_scenario,
+    full_alm_scenario,
 ):
-    result = export_full_alm_result(fallback_scenario, tmp_path)
+    result = export_full_alm_result(full_alm_scenario, tmp_path)
     frames = _read_exported_csvs(result)
 
     assert list(frames["kpi_summary"].columns) == list(ALM_KPI_SUMMARY_COLUMNS)
@@ -175,7 +163,7 @@ def test_exported_csvs_exist_are_readable_and_have_stable_columns(
 
 def test_export_does_not_touch_stage1_baseline_outputs(
     tmp_path,
-    fallback_scenario,
+    full_alm_scenario,
 ):
     if not _PROTECTED_OUTPUTS_DIR.exists():
         pytest.skip("outputs/stage1_baseline/ does not exist")
@@ -184,7 +172,7 @@ def test_export_does_not_touch_stage1_baseline_outputs(
     assert csv_files
     before = {path: os.path.getmtime(path) for path in csv_files}
 
-    export_full_alm_result(fallback_scenario, tmp_path)
+    export_full_alm_result(full_alm_scenario, tmp_path)
 
     after = {path: os.path.getmtime(path) for path in csv_files}
     assert after == before
@@ -192,12 +180,12 @@ def test_export_does_not_touch_stage1_baseline_outputs(
 
 def test_export_does_not_modify_pyproject_or_add_streamlit_core_dependency(
     tmp_path,
-    fallback_scenario,
+    full_alm_scenario,
 ):
     before = _PYPROJECT.read_text()
     before_mtime = os.path.getmtime(_PYPROJECT)
 
-    export_full_alm_result(fallback_scenario, tmp_path)
+    export_full_alm_result(full_alm_scenario, tmp_path)
 
     after = _PYPROJECT.read_text()
     assert after == before

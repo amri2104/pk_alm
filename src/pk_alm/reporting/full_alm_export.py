@@ -8,8 +8,7 @@ The reporting layer is deliberately split into two steps:
   scenario first and then delegates to ``export_full_alm_result(...)``.
 
 Neither function catches AAL failures or switches generation modes. Offline
-fallback remains explicit through ``generation_mode="fallback"`` on the
-wrapper.
+the wrapper always uses the live AAL path.
 """
 
 from __future__ import annotations
@@ -207,14 +206,9 @@ def export_full_alm_result(
 
 def export_full_alm_results(
     output_dir: str | Path,
-    *,
-    generation_mode: str = "aal",
     **scenario_kwargs: object,
 ) -> FullALMExportResult:
     """Run a Full ALM scenario and export the resulting reporting package."""
     out_path = reject_protected_stage1_output_dir(output_dir)
-    result = run_full_alm_scenario(
-        generation_mode=generation_mode,
-        **scenario_kwargs,
-    )
+    result = run_full_alm_scenario(**scenario_kwargs)
     return export_full_alm_result(result, out_path)

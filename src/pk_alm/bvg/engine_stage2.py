@@ -39,7 +39,7 @@ from pk_alm.bvg.entry_dynamics import (
     get_default_entry_assumptions,
 )
 from pk_alm.bvg.portfolio import BVGPortfolioState
-from pk_alm.bvg.portfolio_projection import project_portfolio_one_year
+from pk_alm.bvg.projection import project_portfolio_one_year
 from pk_alm.bvg.retirement_transition import apply_retirement_transitions_to_portfolio
 from pk_alm.bvg.salary_dynamics import (
     MAX_PERMITTED_SALARY_GROWTH_RATE,

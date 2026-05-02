@@ -273,6 +273,7 @@ def _good_result_kwargs():
     return dict(
         initial_state=res.initial_state,
         engine_result=res.engine_result,
+        cashflows=res.cashflows,
         valuation_snapshots=res.valuation_snapshots,
         annual_cashflows=res.annual_cashflows,
         asset_snapshots=res.asset_snapshots,

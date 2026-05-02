@@ -55,8 +55,6 @@ def test_streamlit_app_calls_workflow_only_from_button_flow():
 def test_streamlit_app_has_required_controls_and_session_state():
     text = _app_source()
 
-    assert 'GENERATION_MODES = ("aal", "fallback")' in text
-    assert "st.selectbox(" in text
     assert "st.text_input(" in text
     assert "st.data_editor(" in text
     assert "st.button(" in text
@@ -89,6 +87,5 @@ def test_optional_streamlit_apptest_initial_render_only():
 
     assert not app.exception
     assert any("Full ALM Reporting Prototype" in title.value for title in app.title)
-    assert app.selectbox
     assert app.text_input
     assert app.button

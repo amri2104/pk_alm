@@ -1,4 +1,5 @@
 from pk_alm.bvg.cohorts import ActiveCohort, RetiredCohort
+from pk_alm.bvg.portfolio import BVGPortfolioState
 
 
 def project_active_cohort_one_year(
@@ -50,4 +51,31 @@ def project_retired_cohort_one_year(
         count=cohort.count,
         annual_pension_per_person=cohort.annual_pension_per_person,
         capital_rente_per_person=new_capital,
+    )
+
+
+def project_portfolio_one_year(
+    portfolio: BVGPortfolioState,
+    active_interest_rate: float,
+    retiree_interest_rate: float,
+) -> BVGPortfolioState:
+    """Return a new BVGPortfolioState advanced by one year."""
+    if not isinstance(portfolio, BVGPortfolioState):
+        raise TypeError(
+            f"portfolio must be a BVGPortfolioState, got {type(portfolio).__name__}"
+        )
+
+    projected_active = tuple(
+        project_active_cohort_one_year(c, active_interest_rate)
+        for c in portfolio.active_cohorts
+    )
+    projected_retired = tuple(
+        project_retired_cohort_one_year(c, retiree_interest_rate)
+        for c in portfolio.retired_cohorts
+    )
+
+    return BVGPortfolioState(
+        projection_year=portfolio.projection_year + 1,
+        active_cohorts=projected_active,
+        retired_cohorts=projected_retired,
     )

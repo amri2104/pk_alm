@@ -5,7 +5,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 PROGRESS_DOC = REPO_ROOT / "docs" / "implementation_progress.md"
 PIPELINE_DOC = REPO_ROOT / "docs" / "stage1_pipeline.md"
 OUTPUTS_DOC = REPO_ROOT / "docs" / "stage1_outputs.md"
-TIME_GRID_DOC = REPO_ROOT / "docs" / "time_grid_feasibility.md"
 README = REPO_ROOT / "README.md"
 
 
@@ -16,7 +15,6 @@ def test_progress_doc_exists():
 def test_pipeline_and_outputs_docs_exist():
     assert PIPELINE_DOC.exists()
     assert OUTPUTS_DOC.exists()
-    assert TIME_GRID_DOC.exists()
 
 
 def test_readme_mentions_example_script():
@@ -69,28 +67,15 @@ def test_pipeline_doc_mentions_key_functions():
             PROGRESS_DOC.read_text(),
             PIPELINE_DOC.read_text(),
             OUTPUTS_DOC.read_text(),
-            TIME_GRID_DOC.read_text(),
         ]
     )
     assert "scenario_summary.csv" in combined
     assert "actus_adapter.py" in combined
-    assert "actus_fixtures.py" in combined
-    assert "asset_overlay.py" in combined
     assert "aal_probe.py" in combined
     assert "test_aal_real_contract_smoke.py" in combined
     assert "PublicActusService" in combined
     assert "service-backed" in combined
-    assert "time_grid.py" in combined
-    assert "time_grid_feasibility.md" in combined
-    assert "annual baseline remains the reference" in combined
     assert "874 passed, 8 skipped" in combined
-    assert "monthly_cashflow_generation.py" in combined
-    assert "monthly_reconciliation.py" in combined
-    assert "Sprint 6B" in combined
-    assert "Sprint 6C" in combined
-    assert "monthly PR/RP" in combined
-    assert "monthly-vs-annual" in combined
-    assert "not wired into the default Stage-1 baseline" in combined
     for outdated in (
         "No funding ratio logic",
         "Asset-side modelling is not yet implemented",
@@ -100,7 +85,6 @@ def test_pipeline_doc_mentions_key_functions():
         "AAL is installed",
         "AAL is used in the Stage-1 baseline",
         "real AAL cashflow generation exists",
-        "AAL is required",
         "AAL is wired into the default Stage-1 baseline",
         "monthly simulation is wired into the default baseline",
         "real AAL cashflows are wired into Stage-1",
@@ -118,7 +102,6 @@ def test_docs_use_renamed_projection_year_fields():
             PROGRESS_DOC.read_text(),
             PIPELINE_DOC.read_text(),
             OUTPUTS_DOC.read_text(),
-            TIME_GRID_DOC.read_text(),
         ]
     )
     assert "minimum_funding_ratio_projection_year" in combined
@@ -132,7 +115,6 @@ def test_docs_do_not_use_old_ambiguous_year_field_names():
             PROGRESS_DOC.read_text(),
             PIPELINE_DOC.read_text(),
             OUTPUTS_DOC.read_text(),
-            TIME_GRID_DOC.read_text(),
         ]
     )
     # The old, ambiguous bare names must not appear in any doc. The renamed

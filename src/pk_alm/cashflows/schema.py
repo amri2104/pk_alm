@@ -1,3 +1,13 @@
+"""Canonical cashflow schema shared by liability and asset engines.
+
+Source values distinguish where an event originated:
+- ``"BVG"``: liability-side BVG cashflows.
+- ``"ACTUS"``: live server-emitted AAL/ACTUS asset events.
+- ``"ACTUS_PROXY"``: asset events synthesized by the engine for cashflows
+  the live ACTUS server does not emit.
+- ``"MANUAL"``: manually supplied/imported cashflows.
+"""
+
 from __future__ import annotations
 
 import math
@@ -16,7 +26,7 @@ CASHFLOW_COLUMNS = (
     "source",
 )
 
-VALID_SOURCES = ("BVG", "ACTUS", "MANUAL")
+VALID_SOURCES = ("BVG", "ACTUS", "ACTUS_PROXY", "MANUAL")
 
 
 def _validate_numeric(value: object, field_name: str, *, allow_negative: bool) -> None:

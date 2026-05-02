@@ -126,7 +126,12 @@ Expected Stage 1 modelling:
 
 Bond runoff is allowed in the baseline. Matured principal can be held as cash. Naive reinvestment can later be added as a sensitivity, but it is not part of the first baseline.
 
-AAL must not be a hard dependency of the protected Stage-1 baseline. In the current implementation, the strategic asset-side path lives in the separate AAL Asset Engine: `generation_mode="aal"` is the main asset path, while `generation_mode="fallback"` is an explicit test/comparison/development path only. The optional install profile is `[aal]`.
+AAL is a required project dependency for asset-side ACTUS work. The protected
+Stage-1 baseline itself still uses `assets/deterministic.py` as a transparent
+zero-asset-return reference roll-forward, so its seven CSV outputs remain
+independent of the integrated Full ALM scenario. The strategic asset-side path
+lives in the separate AAL Asset Engine and uses live service-backed ACTUS event
+generation.
 
 ## ALM Analytics Engine
 

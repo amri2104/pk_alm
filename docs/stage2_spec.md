@@ -65,7 +65,6 @@ src/pk_alm/bvg/formulas.py
 src/pk_alm/bvg/cohorts.py
 src/pk_alm/bvg/projection.py
 src/pk_alm/bvg/portfolio.py
-src/pk_alm/bvg/portfolio_projection.py
 src/pk_alm/bvg/cashflow_generation.py
 src/pk_alm/bvg/retirement_transition.py
 src/pk_alm/bvg/engine.py
@@ -98,7 +97,7 @@ steps. The **canonical order** within each projection year `t → t+1` is:
 |---|---|---|
 | 1 | Generate regular **PR / RP** cashflows from the current state at `t` | `cashflow_generation.py` (Stage 1, reused) |
 | 2 | Apply **turnover**: reduce active counts by `turnover_rate`, emit `EX` cashflows for departed vested capital | `turnover.py` (Stage 2, **new**) |
-| 3 | **Project** portfolio one year: interest crediting on capital + age + 1 | `portfolio_projection.py` (Stage 1, reused) |
+| 3 | **Project** portfolio one year: interest crediting on capital + age + 1 | `projection.py` (Stage 1, reused) |
 | 4 | Apply **salary growth**: multiply `gross_salary_per_person` by `(1 + salary_growth_rate)` for each remaining active cohort | `salary_dynamics.py` (Stage 2, **new**) |
 | 5 | Apply **retirement transitions** to the projected state: convert age-65 actives into retirees, emit `KA` cashflows | `retirement_transition.py` (Stage 1, reused) |
 | 6 | Apply **new entrants**: add a fresh active cohort at `entry_age` with `entry_count`, `entry_salary`, and `entry_capital` | `entry_dynamics.py` (Stage 2, **new**) |

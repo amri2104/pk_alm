@@ -26,6 +26,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from pk_alm.adapters.aal_asset_portfolio import AssetSpec
 from pk_alm.analytics.cashflows import (
     find_liquidity_inflection_year,
     summarize_cashflows_by_year,
@@ -58,6 +59,15 @@ from pk_alm.scenarios.result_summary import (
     validate_scenario_result_dataframe,
 )
 from pk_alm.scenarios.stage1_baseline import build_default_stage1_portfolio
+from pk_alm.scenarios.stage1_baseline import (
+    ACTUS_ASSET_TRAJECTORY_FILENAME,
+    ASSET_MODE_ACTUS,
+    ASSET_MODE_DETERMINISTIC,
+    AssetMode,
+    _build_actus_mode_outputs,
+    _resolve_output_dir,
+    _validate_asset_mode,
+)
 
 STAGE2_OUTPUT_FILENAMES: tuple[str, ...] = (
     "cashflows.csv",
@@ -69,6 +79,11 @@ STAGE2_OUTPUT_FILENAMES: tuple[str, ...] = (
     "scenario_summary.csv",
     "demographic_summary.csv",       # Stage-2 specific
     "cashflows_by_type.csv",         # Stage-2 specific
+)
+
+STAGE2_ACTUS_OUTPUT_FILENAMES: tuple[str, ...] = (
+    *STAGE2_OUTPUT_FILENAMES,
+    ACTUS_ASSET_TRAJECTORY_FILENAME,
 )
 
 
@@ -95,6 +110,7 @@ class Stage2BaselineResult:
 
     scenario_id: str
     engine_result: Stage2EngineResult
+    cashflows: pd.DataFrame
     valuation_snapshots: pd.DataFrame
     annual_cashflows: pd.DataFrame
     asset_snapshots: pd.DataFrame
@@ -104,6 +120,7 @@ class Stage2BaselineResult:
     demographic_summary: pd.DataFrame
     cashflows_by_type: pd.DataFrame
     output_dir: Path | None
+    actus_asset_trajectory: pd.DataFrame | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.scenario_id, str) or not self.scenario_id.strip():
@@ -113,6 +130,8 @@ class Stage2BaselineResult:
                 "engine_result must be Stage2EngineResult, "
                 f"got {type(self.engine_result).__name__}"
             )
+        _validate_dataframe(self.cashflows, "cashflows")
+        validate_cashflow_dataframe(self.cashflows)
         _validate_dataframe(self.valuation_snapshots, "valuation_snapshots")
         validate_valuation_dataframe(self.valuation_snapshots)
         _validate_dataframe(self.annual_cashflows, "annual_cashflows")
@@ -133,6 +152,10 @@ class Stage2BaselineResult:
             raise TypeError(
                 f"output_dir must be Path or None, got {type(self.output_dir).__name__}"
             )
+        if self.actus_asset_trajectory is not None and not isinstance(
+            self.actus_asset_trajectory, pd.DataFrame
+        ):
+            raise TypeError("actus_asset_trajectory must be DataFrame or None")
 
 
 def build_default_initial_portfolio_stage2():
@@ -166,6 +189,8 @@ def run_stage2_baseline(
     salary_growth_rate: float = 0.015,
     turnover_rate: float = 0.02,
     entry_assumptions: EntryAssumptions | None = None,
+    asset_mode: AssetMode = ASSET_MODE_DETERMINISTIC,
+    asset_specs: tuple[AssetSpec, ...] | list[AssetSpec] | None = None,
     output_dir: str | Path | None = "outputs/stage2a_population",
 ) -> Stage2BaselineResult:
     """Run the Stage-2 baseline end-to-end with optional CSV export.
@@ -214,6 +239,13 @@ def run_stage2_baseline(
         ``run_stage2_baseline(...)`` and asserts ``outputs/stage1_baseline/``
         is unchanged.
     """
+    resolved_asset_mode = _validate_asset_mode(asset_mode)
+    output_dir = _resolve_output_dir(
+        asset_mode=resolved_asset_mode,
+        output_dir=output_dir,
+        deterministic_default="outputs/stage2a_population",
+        actus_default="outputs/stage2a_actus",
+    )
     if not isinstance(scenario_id, str) or not scenario_id.strip():
         raise ValueError("scenario_id must be a non-empty string")
 
@@ -241,16 +273,32 @@ def run_stage2_baseline(
     )
     validate_valuation_dataframe(valuation_snapshots)
 
-    annual_cashflows = summarize_cashflows_by_year(engine_result.cashflows)
-    validate_annual_cashflow_dataframe(annual_cashflows)
-
-    asset_snapshots = build_deterministic_asset_trajectory(
-        valuation_snapshots,
-        annual_cashflows,
-        target_funding_ratio=target_funding_ratio,
-        annual_return_rate=annual_asset_return,
-        start_year=start_year,
-    )
+    if resolved_asset_mode == ASSET_MODE_DETERMINISTIC:
+        cashflows = engine_result.cashflows.copy(deep=True)
+        annual_cashflows = summarize_cashflows_by_year(cashflows)
+        validate_annual_cashflow_dataframe(annual_cashflows)
+        asset_snapshots = build_deterministic_asset_trajectory(
+            valuation_snapshots,
+            annual_cashflows,
+            target_funding_ratio=target_funding_ratio,
+            annual_return_rate=annual_asset_return,
+            start_year=start_year,
+        )
+        actus_asset_trajectory = None
+    else:
+        (
+            cashflows,
+            annual_cashflows,
+            asset_snapshots,
+            actus_asset_trajectory,
+        ) = _build_actus_mode_outputs(
+            valuation_snapshots=valuation_snapshots,
+            liability_cashflows=engine_result.cashflows,
+            asset_specs=asset_specs,
+            target_funding_ratio=target_funding_ratio,
+            start_year=start_year,
+            horizon_years=horizon_years,
+        )
     validate_asset_dataframe(asset_snapshots)
 
     funding_ratio_trajectory = build_funding_ratio_trajectory(
@@ -287,14 +335,14 @@ def run_stage2_baseline(
     validate_scenario_result_dataframe(scenario_summary)
 
     demographic_summary = _build_demographic_summary(engine_result)
-    cashflows_by_type = _build_cashflows_by_type(engine_result.cashflows)
+    cashflows_by_type = _build_cashflows_by_type(cashflows)
 
     resolved_output_dir: Path | None = None
     if output_dir is not None:
         resolved_output_dir = Path(output_dir)
         resolved_output_dir.mkdir(parents=True, exist_ok=True)
         outputs = {
-            "cashflows.csv": engine_result.cashflows,
+            "cashflows.csv": cashflows,
             "valuation_snapshots.csv": valuation_snapshots,
             "annual_cashflows.csv": annual_cashflows,
             "asset_snapshots.csv": asset_snapshots,
@@ -304,12 +352,20 @@ def run_stage2_baseline(
             "demographic_summary.csv": demographic_summary,
             "cashflows_by_type.csv": cashflows_by_type,
         }
-        for filename in STAGE2_OUTPUT_FILENAMES:
+        if actus_asset_trajectory is not None:
+            outputs[ACTUS_ASSET_TRAJECTORY_FILENAME] = actus_asset_trajectory
+        filenames = (
+            STAGE2_ACTUS_OUTPUT_FILENAMES
+            if resolved_asset_mode == ASSET_MODE_ACTUS
+            else STAGE2_OUTPUT_FILENAMES
+        )
+        for filename in filenames:
             outputs[filename].to_csv(resolved_output_dir / filename, index=False)
 
     return Stage2BaselineResult(
         scenario_id=scenario_id,
         engine_result=engine_result,
+        cashflows=cashflows,
         valuation_snapshots=valuation_snapshots,
         annual_cashflows=annual_cashflows,
         asset_snapshots=asset_snapshots,
@@ -319,6 +375,7 @@ def run_stage2_baseline(
         demographic_summary=demographic_summary,
         cashflows_by_type=cashflows_by_type,
         output_dir=resolved_output_dir,
+        actus_asset_trajectory=actus_asset_trajectory,
     )
 
 

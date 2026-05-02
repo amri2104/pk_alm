@@ -7,9 +7,7 @@ This scenario glues the two engines:
 
 It concatenates both cashflow streams in the canonical CashflowRecord schema
 and recomputes annual cashflow analytics on the combined view. The default
-asset path is the AAL strategic engine; the fallback path is allowed only
-when explicitly requested via ``generation_mode="fallback"``. There is no
-silent fallback.
+asset path is the required live AAL strategic engine.
 
 The scenario does not modify ``run_stage1_baseline(...)``, the BVG modules,
 or the seven default Stage-1 CSV outputs.
@@ -21,13 +19,12 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from pk_alm.adapters.aal_asset_portfolio import AALAssetContractSpec
+from pk_alm.adapters.aal_asset_portfolio import AssetSpec
 from pk_alm.analytics.cashflows import (
     summarize_cashflows_by_year,
     validate_annual_cashflow_dataframe,
 )
 from pk_alm.assets.aal_engine import (
-    VALID_GENERATION_MODES,
     AALAssetEngineResult,
     run_aal_asset_engine,
 )
@@ -50,7 +47,7 @@ class FullALMScenarioResult:
     asset_cashflows: pd.DataFrame
     combined_cashflows: pd.DataFrame
     annual_cashflows: pd.DataFrame
-    generation_mode: str
+    generation_mode: str = "aal"
 
     def __post_init__(self) -> None:
         if not isinstance(self.stage1_result, Stage1BaselineResult):
@@ -73,10 +70,12 @@ class FullALMScenarioResult:
                 )
             validate_cashflow_dataframe(value)
 
-        if not self.asset_cashflows.empty and not (
-            self.asset_cashflows["source"] == "ACTUS"
-        ).all():
-            raise ValueError('asset_cashflows source values must all be "ACTUS"')
+        if not self.asset_cashflows.empty and not set(
+            self.asset_cashflows["source"]
+        ).issubset({"ACTUS", "ACTUS_PROXY"}):
+            raise ValueError(
+                'asset_cashflows source values must be "ACTUS" or "ACTUS_PROXY"'
+            )
 
         expected_rows = len(self.bvg_cashflows) + len(self.asset_cashflows)
         if len(self.combined_cashflows) != expected_rows:
@@ -93,16 +92,11 @@ class FullALMScenarioResult:
             )
         validate_annual_cashflow_dataframe(self.annual_cashflows)
 
-        if self.generation_mode not in VALID_GENERATION_MODES:
+        if self.generation_mode != "aal":
+            raise ValueError('generation_mode is fixed to "aal"')
+        if self.aal_asset_result.generation_mode != "aal":
             raise ValueError(
-                f"generation_mode must be one of {VALID_GENERATION_MODES}, "
-                f"got {self.generation_mode!r}"
-            )
-        if self.generation_mode != self.aal_asset_result.generation_mode:
-            raise ValueError(
-                "generation_mode must match aal_asset_result.generation_mode "
-                f"({self.generation_mode!r} != "
-                f"{self.aal_asset_result.generation_mode!r})"
+                'aal_asset_result.generation_mode must be fixed to "aal"'
             )
 
 
@@ -118,24 +112,13 @@ def run_full_alm_scenario(
     valuation_terminal_age: int = 90,
     target_funding_ratio: float = 1.076,
     annual_asset_return: float = 0.0,
-    asset_specs: tuple[AALAssetContractSpec, ...]
-    | list[AALAssetContractSpec]
-    | None = None,
-    generation_mode: str = "aal",
+    asset_specs: tuple[AssetSpec, ...] | list[AssetSpec] | None = None,
 ) -> FullALMScenarioResult:
     """Run the BVG liability engine and the AAL Asset Engine and combine results.
 
-    The default asset generation mode is ``"aal"`` (the strategic main
-    path). To run offline without AAL, the caller must pass
-    ``generation_mode="fallback"`` explicitly. Silent fallback is not
-    available.
+    Asset-side ACTUS cashflows are generated through the required live AAL
+    path. There is no fixture cashflow path.
     """
-    if generation_mode not in VALID_GENERATION_MODES:
-        raise ValueError(
-            f"generation_mode must be one of {VALID_GENERATION_MODES}, "
-            f"got {generation_mode!r}"
-        )
-
     stage1_result = run_stage1_baseline(
         scenario_id=scenario_id,
         horizon_years=horizon_years,
@@ -150,10 +133,7 @@ def run_full_alm_scenario(
         output_dir=None,
     )
 
-    aal_asset_result = run_aal_asset_engine(
-        specs=asset_specs,
-        generation_mode=generation_mode,
-    )
+    aal_asset_result = run_aal_asset_engine(specs=asset_specs)
 
     bvg_cashflows = stage1_result.engine_result.cashflows
     asset_cashflows = aal_asset_result.cashflows
@@ -178,5 +158,4 @@ def run_full_alm_scenario(
         asset_cashflows=asset_cashflows,
         combined_cashflows=combined_cashflows,
         annual_cashflows=annual_cashflows,
-        generation_mode=generation_mode,
     )

@@ -1,6 +1,7 @@
 """Tests for the ALM KPI / plot-ready output layer (Sprint 7F)."""
 
 import math
+from functools import lru_cache
 
 import pandas as pd
 import pytest
@@ -18,8 +19,9 @@ from pk_alm.analytics.alm_kpis import (
 from pk_alm.scenarios.full_alm_scenario import run_full_alm_scenario
 
 
+@lru_cache(maxsize=1)
 def _scenario():
-    return run_full_alm_scenario(generation_mode="fallback")
+    return run_full_alm_scenario()
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +105,7 @@ def test_kpi_dataclass_rejects_nan_funding_ratio():
 # ---------------------------------------------------------------------------
 
 
-def test_build_alm_kpi_summary_from_fallback_scenario():
+def test_build_alm_kpi_summary_from_full_alm_scenario():
     scenario = _scenario()
     summary = build_alm_kpi_summary(scenario)
     assert isinstance(summary, ALMKPISummary)

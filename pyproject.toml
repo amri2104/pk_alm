@@ -12,10 +12,10 @@ dependencies = [
     "numpy",
     "pandas",
     "matplotlib",
+    "awesome-actus-lib>=1.0.12",
 ]
 
 [project.optional-dependencies]
-aal = ["awesome-actus-lib>=1.0.12"]
 app = ["streamlit"]
 dev = [
     "pytest",

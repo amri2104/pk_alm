@@ -22,7 +22,7 @@ from pk_alm.scenarios.full_alm_scenario import run_full_alm_scenario
 
 @pytest.fixture()
 def plot_inputs():
-    scenario = run_full_alm_scenario(generation_mode="fallback")
+    scenario = run_full_alm_scenario()
     return {
         "funding_ratio_trajectory": scenario.stage1_result.funding_ratio_trajectory,
         "cashflow_by_source": build_cashflow_by_source_plot_table(

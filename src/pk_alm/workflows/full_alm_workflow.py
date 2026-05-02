@@ -140,7 +140,6 @@ def _build_generated_files(
 def run_full_alm_reporting_workflow(
     output_dir: str | Path,
     *,
-    generation_mode: str = "aal",
     benchmark_reference_values: Mapping[str, float] | None = None,
     benchmark_model_values: Mapping[str, float | None] | None = None,
     benchmark_units: Mapping[str, str] | None = None,
@@ -149,12 +148,11 @@ def run_full_alm_reporting_workflow(
 ) -> FullALMWorkflowResult:
     """Run the scriptable Full ALM reporting workflow.
 
-    The default generation mode remains ``"aal"``. Offline fallback must be
-    requested explicitly by passing ``generation_mode="fallback"``.
+    Asset-side ACTUS cashflows are generated through the required live AAL
+    path.
     """
     export_result = export_full_alm_results(
         output_dir,
-        generation_mode=generation_mode,
         **scenario_kwargs,
     )
 
@@ -191,7 +189,7 @@ def run_full_alm_reporting_workflow(
             plot_result,
             benchmark_path,
         ),
-        generation_mode=generation_mode,
+        generation_mode=export_result.scenario_result.generation_mode,
     )
 
 

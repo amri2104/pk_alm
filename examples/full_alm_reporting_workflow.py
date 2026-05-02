@@ -21,10 +21,7 @@ DEFAULT_OUTPUT_DIR = Path("outputs/full_alm_scenario")
 
 
 def main() -> None:
-    result = run_full_alm_reporting_workflow(
-        DEFAULT_OUTPUT_DIR,
-        generation_mode="fallback",
-    )
+    result = run_full_alm_reporting_workflow(DEFAULT_OUTPUT_DIR)
     summary = summarize_generated_outputs(result)
 
     print("=== Full ALM Reporting Workflow ===")
@@ -41,9 +38,7 @@ def main() -> None:
     )
     print(f"Benchmark file          : {benchmark_status}")
     print()
-    print('Note: this example uses generation_mode="fallback" explicitly')
-    print("      for offline reproducibility. The strategic main asset path")
-    print('      remains generation_mode="aal" when AAL is available.')
+    print("Note: this example uses the required live AAL/ACTUS asset path.")
 
 
 if __name__ == "__main__":

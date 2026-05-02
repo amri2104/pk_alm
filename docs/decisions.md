@@ -8,7 +8,7 @@
 
 **Rationale:** ACTUS is strong for standardized financial contract cashflows, especially asset-side instruments. Pension fund liabilities are governed by Swiss pension logic, cohort assumptions, contribution rules, conversion rates, and obligation valuation. These do not map cleanly to a single ACTUS contract type.
 
-**Consequence:** The system keeps ACTUS/AAL where it is strongest, on the asset side, and uses purpose-built Python logic where pension fund semantics require it. The protected deterministic Stage-1 baseline remains runnable without AAL; the integrated Full ALM scenario uses the AAL Asset Engine separately.
+**Consequence:** The system keeps ACTUS/AAL where it is strongest, on the asset side, and uses purpose-built Python logic where pension fund semantics require it. AAL is a required dependency for asset-side ACTUS work. The protected deterministic Stage-1 baseline still uses the zero-asset-return reference asset roll-forward and is not replaced by the integrated Full ALM scenario.
 
 ## ADR 002: Why Stage 1 Is Deterministic Before Stochastic Scenarios
 
@@ -98,4 +98,4 @@
 
 **Rationale:** Stage 1 is the protected reference baseline (per the AGENTS.md Protected Baseline rule). Mutating `engine.py` to take new optional parameters would break that protection: even if the defaults reproduce Stage-1 behaviour, the test suite around Stage 1 implicitly depends on the file's identity. A parallel file keeps the protection guarantee literal: `git diff` on `engine.py` shows no change after Stage 2 lands. This also gives Stage 2 room to evolve its own validation rules and result dataclass without entangling them with Stage-1 invariants.
 
-**Consequence:** Two engines exist (`engine.py`, `engine_stage2.py`). Both can call into the shared building blocks (`portfolio_projection`, `retirement_transition`, `cashflow_generation`). The Stage-2 test suite includes a mandatory equivalence test that pins Stage-2-with-zero-levers identical to Stage 1, so the duplication does not drift.
+**Consequence:** Two engines exist (`engine.py`, `engine_stage2.py`). Both can call into the shared building blocks (`projection`, `retirement_transition`, `cashflow_generation`). The Stage-2 test suite includes a mandatory equivalence test that pins Stage-2-with-zero-levers identical to Stage 1, so the duplication does not drift.

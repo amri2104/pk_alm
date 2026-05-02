@@ -1,12 +1,6 @@
 import inspect
 
-import pytest
-
 from pk_alm.adapters.aal_probe import get_aal_module
-
-
-def _skip_if_aal_missing():
-    return pytest.importorskip("awesome_actus_lib")
 
 
 def _minimal_pam_terms() -> dict:
@@ -30,14 +24,13 @@ def _minimal_pam_contract(module):
     return module.PAM(**_minimal_pam_terms())
 
 
-def test_real_aal_module_is_loaded_through_gateway_if_installed():
-    module = _skip_if_aal_missing()
-
+def test_real_aal_module_is_loaded_through_gateway():
+    module = get_aal_module()
     assert get_aal_module() is module
 
 
-def test_real_aal_pam_contract_can_be_constructed_if_installed():
-    module = _skip_if_aal_missing()
+def test_real_aal_pam_contract_can_be_constructed():
+    module = get_aal_module()
 
     contract = _minimal_pam_contract(module)
     contract_terms = contract.to_dict()
@@ -49,8 +42,8 @@ def test_real_aal_pam_contract_can_be_constructed_if_installed():
     assert contract_terms["notionalPrincipal"] == "100000.0"
 
 
-def test_real_aal_portfolio_accepts_pam_contract_if_installed():
-    module = _skip_if_aal_missing()
+def test_real_aal_portfolio_accepts_pam_contract():
+    module = get_aal_module()
     contract = _minimal_pam_contract(module)
 
     portfolio = module.Portfolio([contract])
@@ -61,8 +54,8 @@ def test_real_aal_portfolio_accepts_pam_contract_if_installed():
     assert list(portfolio.contract_df["contractType"]) == ["PAM"]
 
 
-def test_real_aal_event_generation_api_is_service_backed_if_installed():
-    module = _skip_if_aal_missing()
+def test_real_aal_event_generation_api_is_service_backed():
+    module = get_aal_module()
 
     service = module.PublicActusService()
     signature = inspect.signature(service.generateEvents)

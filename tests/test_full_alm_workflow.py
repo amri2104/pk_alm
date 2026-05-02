@@ -1,6 +1,5 @@
 """Tests for Sprint 9 Full ALM user-facing workflow."""
 
-import inspect
 import os
 import runpy
 from pathlib import Path
@@ -23,15 +22,12 @@ _PYPROJECT = _REPO_ROOT / "pyproject.toml"
 _EXAMPLE_PATH = _REPO_ROOT / "examples" / "full_alm_reporting_workflow.py"
 
 
-def test_workflow_explicit_fallback_creates_csv_and_png_outputs(tmp_path):
-    result = run_full_alm_reporting_workflow(
-        tmp_path,
-        generation_mode="fallback",
-    )
+def test_workflow_creates_csv_and_png_outputs(tmp_path):
+    result = run_full_alm_reporting_workflow(tmp_path)
 
     assert isinstance(result, FullALMWorkflowResult)
     assert result.output_dir == tmp_path.resolve()
-    assert result.generation_mode == "fallback"
+    assert result.generation_mode == "aal"
     assert tuple(result.generated_files.keys()) == ("csv", "png", "benchmark")
     assert len(result.generated_files["csv"]) == len(FULL_ALM_EXPORT_FILENAMES)
     assert len(result.generated_files["png"]) == len(FULL_ALM_PLOT_FILENAMES)
@@ -51,10 +47,7 @@ def test_workflow_explicit_fallback_creates_csv_and_png_outputs(tmp_path):
 
 
 def test_workflow_does_not_create_benchmark_without_inputs(tmp_path):
-    result = run_full_alm_reporting_workflow(
-        tmp_path,
-        generation_mode="fallback",
-    )
+    result = run_full_alm_reporting_workflow(tmp_path)
 
     assert result.benchmark_path is None
     assert result.generated_files["benchmark"] == ()
@@ -64,7 +57,6 @@ def test_workflow_does_not_create_benchmark_without_inputs(tmp_path):
 def test_workflow_creates_benchmark_when_references_are_passed(tmp_path):
     result = run_full_alm_reporting_workflow(
         tmp_path,
-        generation_mode="fallback",
         benchmark_reference_values={"final_funding_ratio_percent": 100.0},
         benchmark_notes={"final_funding_ratio_percent": "caller reference"},
     )
@@ -80,10 +72,7 @@ def test_workflow_creates_benchmark_when_references_are_passed(tmp_path):
 
 def test_workflow_rejects_protected_stage1_output_path():
     with pytest.raises(ValueError):
-        run_full_alm_reporting_workflow(
-            _PROTECTED_OUTPUTS_DIR,
-            generation_mode="fallback",
-        )
+        run_full_alm_reporting_workflow(_PROTECTED_OUTPUTS_DIR)
 
 
 def test_workflow_does_not_mutate_stage1_baseline_outputs(tmp_path):
@@ -94,23 +83,14 @@ def test_workflow_does_not_mutate_stage1_baseline_outputs(tmp_path):
     assert csv_files
     before = {path: os.path.getmtime(path) for path in csv_files}
 
-    run_full_alm_reporting_workflow(
-        tmp_path,
-        generation_mode="fallback",
-    )
+    run_full_alm_reporting_workflow(tmp_path)
 
     after = {path: os.path.getmtime(path) for path in csv_files}
     assert after == before
 
 
-def test_workflow_default_generation_mode_is_aal():
-    sig = inspect.signature(run_full_alm_reporting_workflow)
-    assert sig.parameters["generation_mode"].default == "aal"
-
-
-def test_aal_errors_propagate_without_silent_fallback(tmp_path, monkeypatch):
-    def raise_import_error(output_dir, *, generation_mode="aal", **scenario_kwargs):
-        assert generation_mode == "aal"
+def test_aal_errors_propagate(tmp_path, monkeypatch):
+    def raise_import_error(output_dir, **scenario_kwargs):
         raise ImportError("simulated missing AAL")
 
     monkeypatch.setattr(
@@ -137,7 +117,6 @@ def test_example_script_is_import_safe_and_main_guarded():
 def test_generated_files_summary_is_stable(tmp_path):
     result = run_full_alm_reporting_workflow(
         tmp_path,
-        generation_mode="fallback",
         benchmark_model_values={"conversion_rate_percent": 6.8},
     )
     summary = summarize_generated_outputs(result)
@@ -151,7 +130,7 @@ def test_generated_files_summary_is_stable(tmp_path):
         "total_generated_files",
     ]
     assert summary["output_dir"] == tmp_path.resolve()
-    assert summary["generation_mode"] == "fallback"
+    assert summary["generation_mode"] == "aal"
     assert summary["csv_count"] == len(FULL_ALM_EXPORT_FILENAMES)
     assert summary["png_count"] == len(FULL_ALM_PLOT_FILENAMES)
     assert summary["benchmark_available"] is True
@@ -166,10 +145,7 @@ def test_workflow_does_not_modify_pyproject_or_add_streamlit_core_dependency(
     before = _PYPROJECT.read_text()
     before_mtime = os.path.getmtime(_PYPROJECT)
 
-    run_full_alm_reporting_workflow(
-        tmp_path,
-        generation_mode="fallback",
-    )
+    run_full_alm_reporting_workflow(tmp_path)
 
     after = _PYPROJECT.read_text()
     assert after == before

@@ -5,6 +5,12 @@ executed directly (`python examples/stage1_baseline.py`).
 """
 
 from pathlib import Path
+import sys
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SRC_DIR = REPO_ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 from pk_alm.scenarios.stage1_baseline import run_stage1_baseline
 

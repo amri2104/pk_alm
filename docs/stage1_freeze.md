@@ -76,13 +76,11 @@ It contains the seven protected CSV outputs:
 
 Full ALM reporting outputs belong outside this directory, typically under `outputs/full_alm_scenario/`. Reporting helpers reject `outputs/stage1_baseline/` and child paths as Full ALM export targets.
 
-## AAL / Fallback Policy
+## AAL Policy
 
-`generation_mode="aal"` is the strategic asset-engine path. It requires the optional AAL dependency and service-backed event generation.
-
-`generation_mode="fallback"` is explicit support for tests, comparison, and offline development. The system must not silently switch from AAL mode to fallback mode. AAL errors propagate unless the caller explicitly requests fallback mode.
-
-AAL remains optional for package installation and is not a dependency of the protected Stage-1 baseline.
+AAL is the required asset-engine dependency for integrated ACTUS cashflow
+generation. The protected Stage-1 baseline remains separate and continues to
+use the zero-asset-return reference asset roll-forward.
 
 ## Test Protection
 
@@ -95,7 +93,7 @@ python3 -m pytest
 Current confirmed result:
 
 ```text
-1074 passed, 36 skipped
+840 passed, 1 skipped
 ```
 
 Stage-1 protection is covered by tests for:
@@ -104,7 +102,7 @@ Stage-1 protection is covered by tests for:
 - BVG formulas, cohorts, projection, retirement transitions, valuation, and cashflow generation.
 - Shared cashflow schema validation and source handling.
 - Funding, funding summary, annual cashflow analytics, and scenario result summaries.
-- AAL/fallback mode behavior and no-silent-fallback guarantees.
+- Required-AAL asset engine behaviour and protected-output guarantees.
 - Full ALM export/workflow rejection of protected Stage-1 output paths.
 
 ## Known Limitations

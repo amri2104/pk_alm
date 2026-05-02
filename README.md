@@ -16,45 +16,23 @@ transparent liability proxy with deterministic funding-ratio reporting.
   reporting.
 - Minimal ACTUS/AAL-style adapter boundary implemented for mapping simplified
   event dictionaries into the shared cashflow schema.
-- Deterministic ACTUS-style fixed-rate bond fixtures implemented as
-  manually checkable adapter inputs.
-- Separate asset-cashflow overlay helper implemented for combining BVG
-  baseline cashflows with ACTUS-style fixture cashflows.
-- Optional AAL availability probe implemented for future real AAL integration.
-- Optional AAL API introspection and real-AAL smoke tests document that AAL
-  `1.0.12` can construct `PAM` and `Portfolio` objects when available.
-- Standalone annual/monthly time-grid feasibility utilities implemented for
-  later monthly cashflow work.
-- Standalone monthly BVG PR/RP cashflow generator
-  (`src/pk_alm/bvg/monthly_cashflow_generation.py`) implemented on top of
-  the time-grid layer. PR/RP only; KA and retirement transitions are out of
-  scope. Not wired into the default Stage-1 baseline.
-- Standalone monthly-vs-annual BVG cashflow reconciliation utility
-  (`src/pk_alm/analytics/monthly_reconciliation.py`) implemented to prove
-  monthly PR/RP totals equal the annual generator's totals. Not wired into
-  the default Stage-1 baseline.
-- Optional AAL asset boundary (`src/pk_alm/adapters/aal_asset_boundary.py`)
-  implemented: constructs real AAL `PAM` and `Portfolio` objects when AAL is
-  available; offline ACTUS fixture fallback delivers schema-valid cashflows
-  without AAL. `PublicActusService` is not called; no production event
-  generation is added to the default baseline.
-- Separate pension fund AAL asset demo
-  (`src/pk_alm/scenarios/aal_asset_demo.py` and
-  `examples/pension_fund_aal_asset_demo.py`) implemented for combining
-  Stage-1 BVG liability cashflows with AAL Asset Boundary fallback cashflows.
-  It is separate from `run_stage1_baseline(...)`, uses `output_dir=None`, and
-  does not change the default Stage-1 CSV outputs.
-- Offline-safe multi-contract AAL/ACTUS asset portfolio layer
+- AAL (`awesome-actus-lib>=1.0.12`) is a required dependency for asset-side
+  ACTUS work.
+- The former fixed-rate fixture, overlay, availability-probe, and API
+  introspection support layers have been archived under `archive/`.
+- Former standalone annual/monthly time-grid and monthly PR/RP feasibility
+  utilities have been archived under `archive/`; they are no longer part of
+  the active `pk_alm` package.
+- AAL asset construction helpers (`src/pk_alm/adapters/aal_asset_boundary.py`)
+  implemented for real AAL `PAM` and `Portfolio` objects.
+- The former separate pension fund AAL asset demo has been archived under
+  `archive/`; the active AAL integration path is the AAL Asset Engine and
+  Full ALM Scenario.
+- Multi-contract AAL/ACTUS asset portfolio layer
   (`src/pk_alm/adapters/aal_asset_portfolio.py`) implemented: per-contract
-  specs map into dynamic AAL PAM terms and optional real AAL `Portfolio`
-  construction when AAL is available; reproducible cashflows still use the
-  ACTUS fixture/adapter fallback with `source="ACTUS"`. Service-backed AAL
-  event generation is handled by the separate AAL Asset Engine, not by this
-  portfolio-spec helper.
+  specs map into dynamic AAL PAM terms and real AAL `Portfolio` construction.
 - AAL Asset Engine v1 (`src/pk_alm/assets/aal_engine.py`) implemented. AAL
-  is the strategic asset engine; `generation_mode="aal"` is the main asset
-  path, while `generation_mode="fallback"` is an explicit
-  test/comparison/development path. There is no silent fallback.
+  is the required strategic asset engine for ACTUS cashflow generation.
 - Full ALM Scenario (`src/pk_alm/scenarios/full_alm_scenario.py`)
   implemented: combines BVG liability cashflows with AAL asset-engine
   cashflows through the shared `CashflowRecord` schema without mutating the
@@ -68,7 +46,7 @@ transparent liability proxy with deterministic funding-ratio reporting.
   source modules, tests, examples, docs, or protected Stage-1 outputs.
 - The Stage-1 baseline scenario is available as both a library function and a
   manual-run script.
-- Current tests: **1074 passed, 36 skipped**.
+- Current tests: **840 passed, 1 skipped**.
 
 ## Quick Run
 
@@ -84,44 +62,36 @@ Run the Stage-1 baseline demo:
 python examples/stage1_baseline.py
 ```
 
-Run the separate pension fund AAL asset demo:
-
-```bash
-python examples/pension_fund_aal_asset_demo.py
-```
-
-Run the Full ALM reporting workflow with explicit offline fallback:
+Run the Full ALM reporting workflow:
 
 ```bash
 python examples/full_alm_reporting_workflow.py
 ```
 
-Run the optional Streamlit prototype:
+Run the Streamlit prototype:
 
 ```bash
 python3 -m pip install -e ".[app]"
 python3 -m streamlit run examples/streamlit_full_alm_app.py
 ```
 
-For the Streamlit UI with the AAL asset engine dependency installed:
+For the Streamlit UI, install the app extra in addition to the required core
+dependencies:
 
 ```bash
-python3 -m pip install -e ".[app,aal]"
+python3 -m pip install -e ".[app]"
 ```
 
-The `app` extra installs the Streamlit UI dependency. The `aal` extra installs
-the optional AAL asset-engine dependency.
+The `app` extra installs only the Streamlit UI dependency. AAL is part of the
+main project dependencies.
 
 Run the integrated Full ALM scenario from Python by calling
-`run_full_alm_scenario(...)`. Its default asset path is
-`generation_mode="aal"` and requires the optional AAL install profile:
+`run_full_alm_scenario(...)`. The asset path always uses the required live
+AAL/ACTUS service-backed event generation:
 
 ```bash
-python3 -m pip install -e ".[aal]"
+python3 -m pip install -e .
 ```
-
-For offline development or comparison, pass `generation_mode="fallback"`
-explicitly. The fallback path is not the conceptual main asset path.
 
 When working directly from the `src/` layout without an editable install, run:
 
@@ -188,8 +158,6 @@ provides benchmark reference values or additional model values.
   of the end-to-end Stage-1 pipeline.
 - [docs/stage1_outputs.md](docs/stage1_outputs.md) — reproducibility guide
   for the generated Stage-1 output files.
-- [docs/time_grid_feasibility.md](docs/time_grid_feasibility.md) — feasibility
-  note for future monthly cashflow timing.
 - [docs/user_workflow.md](docs/user_workflow.md) — short analyst workflow for
   the Full ALM reporting outputs.
 - [docs/stage1_spec.md](docs/stage1_spec.md) — Stage-1 specification.
@@ -205,51 +173,20 @@ The current implementation is the **deterministic Stage-1 baseline**:
 - Scenario-level result summary export is included.
 - A minimal ACTUS/AAL-style adapter boundary exists for schema-compatible
   cashflow conversion.
-- Deterministic ACTUS-style fixed-rate bond fixtures exist as manual
-  test/example data for the adapter boundary; they are not an ACTUS engine.
-- A separate asset-cashflow overlay helper can combine BVG baseline cashflows
-  with ACTUS-style fixture cashflows for annual liquidity analytics.
-- The overlay is a shared-schema demonstration, not the default Stage-1
-  scenario, and the default Stage-1 CSV outputs remain unchanged.
-- An optional AAL availability probe can detect `awesome_actus_lib`, version
-  metadata, and expose `get_aal_module()` as a controlled future gateway.
-- Optional AAL API introspection and `tests/test_aal_real_contract_smoke.py`
-  show that real AAL `PAM` and `Portfolio` objects can be constructed when AAL
-  is available. `PublicActusService.generateEvents(...)` appears
-  service-backed via `/eventsBatch`, so no production AAL event adapter has
-  been added.
-- `src/pk_alm/time_grid.py` provides standalone annual/monthly feasibility
-  utilities. The annual baseline remains the reference, and monthly simulation
-  is not part of the default Stage-1 run.
-- `src/pk_alm/bvg/monthly_cashflow_generation.py` and
-  `src/pk_alm/analytics/monthly_reconciliation.py` provide a standalone
-  monthly BVG PR/RP cashflow generator and a monthly-vs-annual reconciliation
-  utility on top of the time-grid layer. They cover only PR and RP; they do
-  not implement KA / retirement-transition timing, monthly valuation, or
-  monthly asset roll-forward, and they are not wired into the default
-  Stage-1 baseline.
-- An optional AAL asset boundary (`src/pk_alm/adapters/aal_asset_boundary.py`)
-  can construct real AAL `PAM` and `Portfolio` objects when AAL is available
-  and delivers offline schema-valid ACTUS cashflows as a fallback. It is not
-  wired into the default Stage-1 baseline and does not call
-  `PublicActusService`.
-- A separate pension fund AAL asset demo can combine Stage-1 BVG liability
-  cashflows with AAL Asset Boundary fallback cashflows for annual liquidity
-  analytics. The demo is a shared-schema demonstration, not the default
-  Stage-1 baseline, and it calls `run_stage1_baseline(...)` only with
-  `output_dir=None`.
-- `src/pk_alm/adapters/aal_asset_portfolio.py` provides an offline-safe
-  multi-contract AAL/ACTUS asset portfolio layer. It can construct multiple
-  real AAL `PAM` model objects and one real AAL `Portfolio` when AAL is
-  available, while reproducible cashflow output uses the existing ACTUS
-  fixture/adapter fallback. It is not wired into the default Stage-1 baseline,
-  does not call `PublicActusService`, and is not a calibrated real pension
-  fund asset allocation.
+- AAL is required for asset-side ACTUS work and is used through
+  `PublicActusService.generateEvents(...)`.
+- Former fixed-rate fixture, overlay, and API inspection helpers are archived
+  under `archive/` and are not part of the active package.
+- Former time-grid and monthly PR/RP feasibility helpers are archived under
+  `archive/` and are not part of the active package or default Stage-1 run.
+- `src/pk_alm/adapters/aal_asset_boundary.py` constructs real AAL `PAM` and
+  `Portfolio` objects.
+- `src/pk_alm/adapters/aal_asset_portfolio.py` provides a multi-contract
+  AAL/ACTUS asset portfolio layer. It is not wired into the default Stage-1
+  baseline and is not a calibrated real pension fund asset allocation.
 - `src/pk_alm/assets/aal_engine.py` is the strategic asset-side engine. Its
-  default `generation_mode="aal"` path uses AAL and raises clearly when AAL or
-  the service-backed event path is unavailable. The explicit
-  `generation_mode="fallback"` path is for tests, comparison, and offline
-  development only; it is never used silently.
+  live AAL path raises clearly when the service-backed event path is
+  unavailable.
 - `src/pk_alm/scenarios/full_alm_scenario.py` is the integrated BVG + AAL
   scenario layer. It preserves the canonical `CashflowRecord` schema and does
   not replace or mutate the protected `run_stage1_baseline(...)` outputs.
@@ -258,9 +195,9 @@ The current implementation is the **deterministic Stage-1 baseline**:
 - `src/pk_alm/reporting/` exports Full ALM scenario outputs, saves matplotlib
   PNG plots, and prepares benchmark/plausibility tables from caller-provided
   reference values. It does not add Streamlit or new economic assumptions.
-- AAL remains optional for the package installation and is not a dependency of
-  the protected Stage-1 baseline. Install the optional profile with
-  `pip install -e ".[aal]"` when running the strategic AAL asset path locally.
+- AAL is a main project dependency. The protected Stage-1 baseline still uses
+  `assets/deterministic.py` as a transparent zero-asset-return reference
+  baseline and therefore remains byte-stable across this AAL refactor.
 - No stochastic interest-rate scenarios yet.
 - No mortality, new entrants, wage growth, inflation, survivor benefits, or
   disability benefits.

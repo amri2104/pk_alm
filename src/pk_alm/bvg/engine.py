@@ -8,7 +8,7 @@ import pandas as pd
 
 from pk_alm.bvg.cashflow_generation import generate_bvg_cashflow_dataframe_for_state
 from pk_alm.bvg.portfolio import BVGPortfolioState
-from pk_alm.bvg.portfolio_projection import project_portfolio_one_year
+from pk_alm.bvg.projection import project_portfolio_one_year
 from pk_alm.bvg.retirement_transition import (
     apply_retirement_transitions_to_portfolio,
 )

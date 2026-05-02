@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from pk_alm.adapters.aal_asset_portfolio import AssetSpec
 from pk_alm.analytics.cashflows import (
     find_liquidity_inflection_year,
     summarize_cashflows_by_year,
@@ -46,6 +47,15 @@ from pk_alm.scenarios.stage2_baseline import (
     Stage2BaselineResult,
     run_stage2_baseline,
 )
+from pk_alm.scenarios.stage1_baseline import (
+    ACTUS_ASSET_TRAJECTORY_FILENAME,
+    ASSET_MODE_ACTUS,
+    ASSET_MODE_DETERMINISTIC,
+    AssetMode,
+    _build_actus_mode_outputs,
+    _resolve_output_dir,
+    _validate_asset_mode,
+)
 
 STAGE2B_OUTPUT_FILENAMES: tuple[str, ...] = (
     "cashflows.csv",
@@ -59,6 +69,11 @@ STAGE2B_OUTPUT_FILENAMES: tuple[str, ...] = (
     "cashflows_by_type.csv",
     "survival_factors.csv",
     "mortality_assumptions.csv",
+)
+
+STAGE2B_ACTUS_OUTPUT_FILENAMES: tuple[str, ...] = (
+    *STAGE2B_OUTPUT_FILENAMES,
+    ACTUS_ASSET_TRAJECTORY_FILENAME,
 )
 
 STAGE2B_FUNDING_RATIO_COLUMNS = (
@@ -110,6 +125,7 @@ class Stage2BMortalityResult:
     survival_factors: pd.DataFrame
     mortality_assumptions: pd.DataFrame
     output_dir: Path | None
+    actus_asset_trajectory: pd.DataFrame | None = None
 
     def __post_init__(self) -> None:
         if self.mortality_mode not in (MORTALITY_MODE_OFF, MORTALITY_MODE_EK0105):
@@ -132,6 +148,10 @@ class Stage2BMortalityResult:
         _validate_dataframe(self.mortality_assumptions, "mortality_assumptions")
         if self.output_dir is not None and not isinstance(self.output_dir, Path):
             raise TypeError("output_dir must be Path or None")
+        if self.actus_asset_trajectory is not None and not isinstance(
+            self.actus_asset_trajectory, pd.DataFrame
+        ):
+            raise TypeError("actus_asset_trajectory must be DataFrame or None")
 
     @property
     def portfolio_states(self):
@@ -155,9 +175,23 @@ def run_stage2b_mortality(
     salary_growth_rate: float = 0.015,
     turnover_rate: float = 0.02,
     entry_assumptions: EntryAssumptions | None = None,
+    asset_mode: AssetMode = ASSET_MODE_DETERMINISTIC,
+    asset_specs: tuple[AssetSpec, ...] | list[AssetSpec] | None = None,
     output_dir: str | Path | None = "outputs/stage2b_mortality",
 ) -> Stage2BMortalityResult:
-    """Run Stage 2B mortality over the Stage-2A population path."""
+    """Run Stage 2B mortality over the Stage-2A population path.
+
+    In ``asset_mode="actus"``, mortality still affects only liability-side
+    RP cashflows and retiree PV. The AAL asset portfolio and proxy asset
+    cashflows are not mortality-weighted.
+    """
+    resolved_asset_mode = _validate_asset_mode(asset_mode)
+    output_dir = _resolve_output_dir(
+        asset_mode=resolved_asset_mode,
+        output_dir=output_dir,
+        deterministic_default="outputs/stage2b_mortality",
+        actus_default="outputs/stage2b_actus",
+    )
     if mortality_mode not in (MORTALITY_MODE_OFF, MORTALITY_MODE_EK0105):
         raise ValueError("mortality_mode must be 'off' or 'ek0105'")
     if mortality_table_id not in SUPPORTED_EK0105_TABLE_IDS:
@@ -179,6 +213,8 @@ def run_stage2b_mortality(
         salary_growth_rate=salary_growth_rate,
         turnover_rate=turnover_rate,
         entry_assumptions=entry_assumptions,
+        asset_mode=resolved_asset_mode,
+        asset_specs=asset_specs,
         output_dir=None,
     )
 
@@ -193,11 +229,15 @@ def run_stage2b_mortality(
         funding_ratio_trajectory = stage2a.funding_ratio_trajectory.copy(deep=True)
         funding_summary = stage2a.funding_summary.copy(deep=True)
         cashflows_by_type = stage2a.cashflows_by_type.copy(deep=True)
+        actus_asset_trajectory = (
+            None
+            if stage2a.actus_asset_trajectory is None
+            else stage2a.actus_asset_trajectory.copy(deep=True)
+        )
     else:
-        cashflows = _build_mortality_weighted_cashflows(
+        liability_cashflows = _build_mortality_weighted_cashflows(
             stage2a, mortality_table, start_year
         )
-        annual_cashflows = summarize_cashflows_by_year(cashflows)
         mortality_valuation_for_funding = value_portfolio_states_stage2b(
             stage2a.engine_result.portfolio_states,
             technical_interest_rate,
@@ -205,15 +245,38 @@ def run_stage2b_mortality(
             mortality_mode,
             mortality_table,
         )
-        asset_snapshots = _build_stage2b_asset_trajectory(
-            annual_cashflows=annual_cashflows,
-            valuation_snapshots=mortality_valuation_for_funding,
-            initial_assets=float(
-                stage2a.asset_snapshots.iloc[0]["closing_asset_value"]
-            ),
-            annual_asset_return=annual_asset_return,
-            start_year=start_year,
-        )
+        if resolved_asset_mode == ASSET_MODE_DETERMINISTIC:
+            cashflows = liability_cashflows
+            annual_cashflows = summarize_cashflows_by_year(cashflows)
+            asset_snapshots = _build_stage2b_asset_trajectory(
+                annual_cashflows=annual_cashflows,
+                valuation_snapshots=mortality_valuation_for_funding,
+                initial_assets=float(
+                    stage2a.asset_snapshots.iloc[0]["closing_asset_value"]
+                ),
+                annual_asset_return=annual_asset_return,
+                start_year=start_year,
+            )
+            actus_asset_trajectory = None
+        else:
+            (
+                cashflows,
+                annual_cashflows,
+                asset_snapshots,
+                actus_asset_trajectory,
+            ) = _build_actus_mode_outputs(
+                valuation_snapshots=stage2a.valuation_snapshots,
+                liability_cashflows=liability_cashflows,
+                asset_specs=asset_specs,
+                target_funding_ratio=target_funding_ratio,
+                start_year=start_year,
+                horizon_years=horizon_years,
+                initial_liability=float(
+                    mortality_valuation_for_funding.iloc[0][
+                        "total_stage2b_liability"
+                    ]
+                ),
+            )
         funding_ratio_trajectory = _build_stage2b_funding_ratio_trajectory(
             asset_snapshots, mortality_valuation_for_funding
         )
@@ -266,7 +329,14 @@ def run_stage2b_mortality(
             "survival_factors.csv": survival_factors,
             "mortality_assumptions.csv": mortality_assumptions,
         }
-        for filename in STAGE2B_OUTPUT_FILENAMES:
+        if actus_asset_trajectory is not None:
+            outputs[ACTUS_ASSET_TRAJECTORY_FILENAME] = actus_asset_trajectory
+        filenames = (
+            STAGE2B_ACTUS_OUTPUT_FILENAMES
+            if resolved_asset_mode == ASSET_MODE_ACTUS
+            else STAGE2B_OUTPUT_FILENAMES
+        )
+        for filename in filenames:
             outputs[filename].to_csv(resolved_output_dir / filename, index=False)
 
     return Stage2BMortalityResult(
@@ -286,6 +356,7 @@ def run_stage2b_mortality(
         survival_factors=survival_factors,
         mortality_assumptions=mortality_assumptions,
         output_dir=resolved_output_dir,
+        actus_asset_trajectory=actus_asset_trajectory,
     )
 
 
