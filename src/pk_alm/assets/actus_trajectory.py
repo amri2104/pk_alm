@@ -1,4 +1,9 @@
-"""Asset-side year-end trajectory for live AAL plus proxy cashflows."""
+"""Asset-side year-end trajectory for live AAL server cashflows.
+
+The trajectory uses only real AAL/ACTUS server events as cashflows. STK market
+values are still valued from the scenario assumption while open, but missing
+STK dividends and CSH interest are not synthesized as cashflows.
+"""
 
 from __future__ import annotations
 
@@ -23,8 +28,6 @@ ACTUS_ASSET_TRAJECTORY_COLUMNS = (
     "stk_market_value",
     "csh_value",
     "coupon_income",
-    "dividend_income",
-    "proxy_interest_income",
     "realized_maturity_or_td",
     "closing_asset_value",
 )
@@ -128,17 +131,6 @@ def compute_actus_asset_trajectory(
             event_types={"IP"},
             source="ACTUS",
         )
-        dividend_income = _cashflow_total(
-            cashflows,
-            year=year,
-            event_types={"DV"},
-        )
-        proxy_interest_income = _cashflow_total(
-            cashflows,
-            year=year,
-            event_types={"IP"},
-            source="ACTUS_PROXY",
-        )
         realized_maturity_or_td = _cashflow_total(
             cashflows,
             year=year,
@@ -158,8 +150,6 @@ def compute_actus_asset_trajectory(
                 "stk_market_value": stk_market_value,
                 "csh_value": csh_value,
                 "coupon_income": coupon_income,
-                "dividend_income": dividend_income,
-                "proxy_interest_income": proxy_interest_income,
                 "realized_maturity_or_td": realized_maturity_or_td,
                 "closing_asset_value": closing_asset_value,
             }

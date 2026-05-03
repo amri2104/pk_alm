@@ -70,12 +70,10 @@ class FullALMScenarioResult:
                 )
             validate_cashflow_dataframe(value)
 
-        if not self.asset_cashflows.empty and not set(
-            self.asset_cashflows["source"]
-        ).issubset({"ACTUS", "ACTUS_PROXY"}):
-            raise ValueError(
-                'asset_cashflows source values must be "ACTUS" or "ACTUS_PROXY"'
-            )
+        if not self.asset_cashflows.empty and not (
+            self.asset_cashflows["source"] == "ACTUS"
+        ).all():
+            raise ValueError('asset_cashflows source values must all be "ACTUS"')
 
         expected_rows = len(self.bvg_cashflows) + len(self.asset_cashflows)
         if len(self.combined_cashflows) != expected_rows:

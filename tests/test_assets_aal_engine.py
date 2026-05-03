@@ -142,7 +142,6 @@ def _mixed_specs() -> tuple[AALAssetContractSpec, ...]:
             "ENGINE_CSH_1",
             2026,
             50_000.0,
-            assumed_return=0.01,
         ),
     )
 
@@ -183,28 +182,17 @@ def test_engine_accepts_custom_specs(monkeypatch):
     assert set(result.cashflows["contractId"]) == {"ENGINE_PAM_1"}
 
 
-def test_engine_dispatches_mixed_specs_and_synthesizes_proxy_cashflows(monkeypatch):
+def test_engine_dispatches_mixed_specs_with_server_events_only(monkeypatch):
     _patch_fake_aal(monkeypatch)
-    result = run_aal_asset_engine(specs=_mixed_specs(), horizon_years=3)
+    result = run_aal_asset_engine(specs=_mixed_specs())
 
     sources = set(result.cashflows["source"])
-    assert sources == {"ACTUS", "ACTUS_PROXY"}
-    assert set(result.cashflows.loc[result.cashflows["source"] == "ACTUS", "type"]) == {
-        "IP",
-        "MD",
-        "TD",
-    }
-    proxy = result.cashflows[result.cashflows["source"] == "ACTUS_PROXY"]
-    assert set(proxy["type"]) == {"DV", "IP"}
-    assert len(proxy[proxy["type"] == "DV"]) == 4
-    assert len(proxy[proxy["contractId"] == "ENGINE_CSH_1"]) == 3
-    first_dv = proxy[
-        (proxy["contractId"] == "ENGINE_STK_1") & (proxy["type"] == "DV")
-    ].iloc[0]
-    assert first_dv["time"] == pd.Timestamp("2027-01-01T00:00:00")
-    assert first_dv["payoff"] == pytest.approx(0.025 * 100_000.0 * 1.04)
+    assert sources == {"ACTUS"}
+    assert set(result.cashflows["type"]) == {"IP", "MD", "TD"}
+    assert "ENGINE_CSH_1" not in set(result.cashflows["contractId"])
     assert "Processed specs: 1 PAM, 1 STK, 1 CSH" in " | ".join(result.notes)
-    assert "ACTUS_PROXY events: 7" in " | ".join(result.notes)
+    assert "Server events: 3" in " | ".join(result.notes)
+    assert "CSH contracts return no temporal events" in " | ".join(result.notes)
 
 
 def test_engine_rejects_empty_specs(monkeypatch):
@@ -254,28 +242,6 @@ def test_engine_wraps_mapping_failures(monkeypatch):
     monkeypatch.setattr(aal_engine, "get_aal_module", lambda: _BadMappingModule)
     with pytest.raises(RuntimeError, match="event mapping"):
         run_aal_asset_engine(specs=_custom_specs())
-
-
-def test_engine_raises_if_server_and_proxy_both_emit_stk_dv(monkeypatch):
-    class _DividendService:
-        def generateEvents(self, *, portfolio):
-            return [
-                {
-                    "contractId": "ENGINE_STK_1",
-                    "time": "2027-01-01T00:00:00",
-                    "type": "DV",
-                    "payoff": 1_000.0,
-                    "nominalValue": 100_000.0,
-                    "currency": "CHF",
-                }
-            ]
-
-    class _DividendModule(_FakeAALModule):
-        PublicActusService = _DividendService
-
-    monkeypatch.setattr(aal_engine, "get_aal_module", lambda: _DividendModule)
-    with pytest.raises(RuntimeError, match="double-counting guard"):
-        run_aal_asset_engine(specs=_mixed_specs())
 
 
 def test_synthetic_aal_dict_event_maps_to_schema():
@@ -426,12 +392,13 @@ def test_result_dataclass_rejects_non_asset_source_rows(monkeypatch):
         AALAssetEngineResult(**kwargs)
 
 
-def test_result_dataclass_accepts_actus_proxy_source_rows(monkeypatch):
+def test_result_dataclass_rejects_actus_proxy_source_rows(monkeypatch):
     kwargs = _good_result_kwargs(monkeypatch)
     proxy = kwargs["cashflows"].copy()
     proxy.loc[0, "source"] = "ACTUS_PROXY"
     kwargs["cashflows"] = proxy
-    assert AALAssetEngineResult(**kwargs).cashflows.iloc[0]["source"] == "ACTUS_PROXY"
+    with pytest.raises(ValueError, match="source"):
+        AALAssetEngineResult(**kwargs)
 
 
 def test_result_dataclass_rejects_invalid_fixed_generation_mode(monkeypatch):
@@ -486,5 +453,4 @@ def test_required_aal_default_specs_can_run_against_live_service():
     assert result.generation_mode == "aal"
     assert result.aal_available is True
     assert validate_cashflow_dataframe(result.cashflows) is True
-    assert set(result.cashflows["source"]).issubset({"ACTUS", "ACTUS_PROXY"})
-    assert "ACTUS_PROXY" in set(result.cashflows["source"])
+    assert set(result.cashflows["source"]) == {"ACTUS"}

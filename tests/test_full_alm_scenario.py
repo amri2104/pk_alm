@@ -133,9 +133,7 @@ def test_annual_cashflows_not_empty(fake_aal_engine):
 
 def test_asset_cashflows_have_source_actus_only(fake_aal_engine):
     result = run_full_alm_scenario()
-    assert set(result.asset_cashflows["source"]).issubset(
-        {"ACTUS", "ACTUS_PROXY"}
-    )
+    assert set(result.asset_cashflows["source"]) == {"ACTUS"}
 
 
 def test_bvg_cashflows_have_source_bvg_only(fake_aal_engine):

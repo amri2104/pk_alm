@@ -2,9 +2,9 @@
 
 Source values distinguish where an event originated:
 - ``"BVG"``: liability-side BVG cashflows.
-- ``"ACTUS"``: live server-emitted AAL/ACTUS asset events.
-- ``"ACTUS_PROXY"``: asset events synthesized by the engine for cashflows
-  the live ACTUS server does not emit.
+- ``"ACTUS"``: live server-emitted AAL/ACTUS asset events. The ACTUS asset
+  mode records only real AAL server responses; observed STK/CSH server
+  limitations are documented rather than compensated with local cashflows.
 - ``"MANUAL"``: manually supplied/imported cashflows.
 """
 
@@ -26,7 +26,7 @@ CASHFLOW_COLUMNS = (
     "source",
 )
 
-VALID_SOURCES = ("BVG", "ACTUS", "ACTUS_PROXY", "MANUAL")
+VALID_SOURCES = ("BVG", "ACTUS", "MANUAL")
 
 
 def _validate_numeric(value: object, field_name: str, *, allow_negative: bool) -> None:

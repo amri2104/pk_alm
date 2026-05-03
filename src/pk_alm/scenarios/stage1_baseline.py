@@ -367,7 +367,6 @@ def _build_actus_mode_outputs(
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     asset_result = run_aal_asset_engine(
         asset_specs,
-        horizon_years=horizon_years,
     )
     liability_for_calibration = (
         float(valuation_snapshots.iloc[0]["total_stage1_liability"])

@@ -14,7 +14,7 @@ Stage 1 covers Goal 1 of the bachelor thesis:
 - Compute funding ratio at inception and over time.
 - Compute structural net cashflows.
 - Identify the liquidity inflection point.
-- Report income yield from contractual and proxy income cashflows.
+- Report income yield from contractual asset cashflows where available.
 - Report `Pensionierungsverlust` as a KPI / P&L effect.
 - Run deterministic stress scenarios.
 - Validate results against plausibility ranges from the thesis documents and Complementa-style benchmarks.
@@ -47,8 +47,9 @@ Stage 1 uses a three-engine architecture:
 
 2. **AAL Asset Engine**
    - Models asset-side cashflows.
-   - Uses AAL/ACTUS mainly for contractual asset cashflows, especially bonds.
-   - Allows proxy models for equities and real estate with external value assumptions.
+   - Uses AAL/ACTUS for live server-emitted asset cashflows.
+   - Allows equity and real-estate value assumptions in asset snapshots, but
+     does not synthesize missing ACTUS cashflow events.
 
 3. **ALM Analytics Engine**
    - Merges asset and liability cashflows.
@@ -60,7 +61,7 @@ All engines communicate through a shared cashflow schema.
 
 Every cashflow event must use the same columns:
 
-- `contractId`: ACTUS contract ID, BVG cohort ID, or proxy ID.
+- `contractId`: ACTUS contract ID, BVG cohort ID, or manual ID.
 - `time`: event date.
 - `type`: event code.
 - `payoff`: cash amount from the pension fund perspective.
@@ -120,7 +121,9 @@ Expected Stage 1 modelling:
 
 - Bonds should be represented through ACTUS-style contractual cashflows where possible.
 - ACTUS is used mainly for contractual asset cashflows, especially bonds.
-- Equities and real estate may be proxy models with external value and income assumptions.
+- Equities and real estate may use external market-value assumptions in
+  asset snapshots, but missing dividend or rental cashflows are not
+  synthesized locally.
 - Cash may be represented as a simple cash position.
 - Alternatives may be excluded or treated as a documented constant block in Stage 1.
 
@@ -242,7 +245,8 @@ Stage 1 is not a full going-concern pension fund model. In particular:
 - No new entrants are modelled.
 - Salaries are constant.
 - Pension indexation is ignored.
-- Equity and real estate are proxy models.
+- Equity and real-estate market values are simplified assumptions; the tested
+  AAL reference server does not emit STK dividend events.
 - Bond reinvestment is not part of the baseline.
 - No dynamic allocation strategy is modelled.
 

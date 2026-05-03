@@ -434,11 +434,12 @@ def test_validate_invalid_source():
         validate_cashflow_dataframe(df)
 
 
-def test_validate_actus_proxy_source():
+def test_validate_actus_proxy_source_rejected():
     df = _valid_df()
     df = _set_value(df, "source", "ACTUS_PROXY")
-    assert validate_cashflow_dataframe(df) is True
+    with pytest.raises(ValueError, match="source"):
+        validate_cashflow_dataframe(df)
 
 
 def test_valid_sources_constant():
-    assert VALID_SOURCES == ("BVG", "ACTUS", "ACTUS_PROXY", "MANUAL")
+    assert VALID_SOURCES == ("BVG", "ACTUS", "MANUAL")

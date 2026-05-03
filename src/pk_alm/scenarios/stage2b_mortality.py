@@ -182,8 +182,8 @@ def run_stage2b_mortality(
     """Run Stage 2B mortality over the Stage-2A population path.
 
     In ``asset_mode="actus"``, mortality still affects only liability-side
-    RP cashflows and retiree PV. The AAL asset portfolio and proxy asset
-    cashflows are not mortality-weighted.
+    RP cashflows and retiree PV. The live AAL asset portfolio is not
+    mortality-weighted.
     """
     resolved_asset_mode = _validate_asset_mode(asset_mode)
     output_dir = _resolve_output_dir(

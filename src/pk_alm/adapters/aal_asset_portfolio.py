@@ -1,9 +1,10 @@
 """AAL/ACTUS asset portfolio specs and construction helpers.
 
 Phase 2 asset modelling uses explicit spec classes for PAM bonds, STK
-positions, and CSH cash positions. The AAL Asset Engine still consumes only
-the PAM subset until the next refactor step wires STK/CSH dispatch and proxy
-cashflows into ``run_aal_asset_engine``.
+positions, and CSH cash positions. PAM, STK, and CSH contracts are sent to
+the live AAL server. The engine records only server-emitted asset cashflows:
+PAM emits IP/MD, STK currently emits TD but no DV on the tested public AAL
+reference server, and CSH currently emits no temporal events.
 """
 
 from __future__ import annotations
@@ -155,7 +156,16 @@ class PAMSpec(AALAssetContractSpec):
 
 @dataclass(frozen=True)
 class STKSpec(AALAssetContractSpec):
-    """Specification for one STK position plus local proxy assumptions."""
+    """Specification for one STK position.
+
+    ``dividend_yield`` declares dividend intent in the AAL Group 1 terms when
+    positive. The tested public AAL reference server does not emit DV events,
+    and the Python engine does not synthesize dividends.
+
+    ``market_value_growth`` is used to derive ``price_at_termination`` for the
+    ACTUS TD event and to value the open STK position in asset snapshots. It
+    does not generate Python-side cashflow events.
+    """
 
     contract_id: str
     start_year: int
@@ -231,13 +241,17 @@ class STKSpec(AALAssetContractSpec):
 
 @dataclass(frozen=True)
 class CSHSpec(AALAssetContractSpec):
-    """Specification for one CSH cash position plus local proxy return."""
+    """Specification for one CSH cash position.
+
+    CSH is sent to the live AAL Portfolio for completeness. The tested public
+    AAL reference server emits no temporal CSH events, and the Python engine
+    does not synthesize cash interest.
+    """
 
     contract_id: str
     start_year: int
     nominal_value: float
     currency: str = "CHF"
-    assumed_return: float = 0.0
 
     @property
     def contract_type(self) -> str:
@@ -252,19 +266,12 @@ class CSHSpec(AALAssetContractSpec):
             min_value=0.0,
             allow_equal_min=False,
         )
-        assumed_return = _validate_non_bool_real(
-            self.assumed_return,
-            "assumed_return",
-            min_value=0.0,
-            allow_equal_min=True,
-        )
         currency = _validate_currency(self.currency)
 
         object.__setattr__(self, "contract_id", contract_id)
         object.__setattr__(self, "start_year", start_year)
         object.__setattr__(self, "nominal_value", nominal_value)
         object.__setattr__(self, "currency", currency)
-        object.__setattr__(self, "assumed_return", assumed_return)
 
 
 AssetSpec: TypeAlias = PAMSpec | STKSpec | CSHSpec
@@ -357,7 +364,6 @@ DEFAULT_AAL_ASSET_CONTRACT_SPECS: tuple[AssetSpec, ...] = (
         contract_id="AAL_CSH_CASH",
         start_year=2026,
         nominal_value=250_000.0,
-        assumed_return=0.0,
     ),
     _stk_spec_from_nominal(
         contract_id="AAL_STK_ALTERNATIVES_PROXY",

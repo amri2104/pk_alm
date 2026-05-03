@@ -24,28 +24,12 @@ def _specs():
             dividend_yield=0.025,
             market_value_growth=0.04,
         ),
-        CSHSpec("CSH_1", 2026, 50_000.0, assumed_return=0.01),
+        CSHSpec("CSH_1", 2026, 50_000.0),
     )
 
 
 def _cashflows():
     records = [
-        CashflowRecord(
-            "STK_1",
-            "2027-01-01T00:00:00",
-            "DV",
-            2_600.0,
-            104_000.0,
-            source="ACTUS_PROXY",
-        ),
-        CashflowRecord(
-            "CSH_1",
-            "2027-01-01T00:00:00",
-            "IP",
-            500.0,
-            50_000.0,
-            source="ACTUS_PROXY",
-        ),
         CashflowRecord(
             "PAM_1",
             "2028-12-31T00:00:00",
@@ -118,20 +102,18 @@ def test_cash_balance_accumulates_realized_asset_cashflows():
     )
     cash_by_year = dict(zip(trajectory["year"], trajectory["cash_balance"]))
     assert cash_by_year[2026] == pytest.approx(10_000.0)
-    assert cash_by_year[2027] == pytest.approx(13_100.0)
-    assert cash_by_year[2028] == pytest.approx(115_100.0)
-    assert cash_by_year[2029] == pytest.approx(227_586.4)
+    assert cash_by_year[2027] == pytest.approx(10_000.0)
+    assert cash_by_year[2028] == pytest.approx(112_000.0)
+    assert cash_by_year[2029] == pytest.approx(224_486.4)
 
 
-def test_income_columns_split_coupon_dividend_interest_and_realizations():
+def test_income_columns_split_coupon_and_realizations():
     trajectory = compute_actus_asset_trajectory(_specs(), _cashflows(), 3)
     row_2027 = trajectory[trajectory["year"] == 2027].iloc[0]
     row_2028 = trajectory[trajectory["year"] == 2028].iloc[0]
     row_2029 = trajectory[trajectory["year"] == 2029].iloc[0]
 
     assert row_2027["coupon_income"] == 0.0
-    assert row_2027["dividend_income"] == 2_600.0
-    assert row_2027["proxy_interest_income"] == 500.0
     assert row_2028["coupon_income"] == 2_000.0
     assert row_2028["realized_maturity_or_td"] == 100_000.0
     assert row_2029["realized_maturity_or_td"] == 112_486.4

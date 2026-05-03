@@ -247,10 +247,13 @@ def test_invalid_csh_nominal_value_rejected(bad):
         CSHSpec("BAD", 2026, bad)
 
 
-@pytest.mark.parametrize("bad", [-0.01, math.nan, "0.01"])
-def test_invalid_csh_assumed_return_rejected(bad):
-    with pytest.raises((TypeError, ValueError)):
-        CSHSpec("BAD", 2026, 100_000.0, assumed_return=bad)
+def test_csh_spec_has_only_required_contract_fields():
+    spec = CSHSpec("CSH", 2026, 100_000.0)
+    assert spec.contract_id == "CSH"
+    assert spec.start_year == 2026
+    assert spec.nominal_value == 100_000.0
+    assert spec.currency == "CHF"
+    assert not hasattr(spec, "assumed_return")
 
 
 def test_empty_portfolio_specs_rejected():

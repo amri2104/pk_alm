@@ -4,9 +4,9 @@ This is the asset-side counterpart to the BVG liability engine. It takes a
 small set of PAM, STK, and CSH contract specs, builds real AAL contracts and
 a real AAL ``Portfolio``, and uses AAL's service-backed event generation API
 (``PublicActusService.generateEvents``) to produce schema-valid cashflows in
-the canonical CashflowRecord schema. STK dividend and CSH interest events are
-synthesized as ``ACTUS_PROXY`` cashflows where the live AAL server does not
-emit them.
+the canonical CashflowRecord schema. The engine records only real AAL server
+responses: PAM contracts emit IP/MD, STK contracts emit TD but no DV on the
+tested public reference server, and CSH contracts emit no temporal events.
 
 ``awesome_actus_lib`` is a required project dependency. There is no fixture
 cashflow path and no generation-mode switch.
@@ -31,14 +31,9 @@ from pk_alm.adapters.aal_asset_portfolio import (
 )
 from pk_alm.adapters.aal_probe import get_aal_module
 from pk_alm.adapters.actus_adapter import aal_events_to_cashflow_dataframe
-from pk_alm.cashflows.schema import (
-    CASHFLOW_COLUMNS,
-    CashflowRecord,
-    cashflow_records_to_dataframe,
-    validate_cashflow_dataframe,
-)
+from pk_alm.cashflows.schema import validate_cashflow_dataframe
 
-_ASSET_ENGINE_SOURCES = {"ACTUS", "ACTUS_PROXY"}
+_ASSET_ENGINE_SOURCES = {"ACTUS"}
 _SORT_COLUMNS = ["time", "contractId", "type", "source"]
 
 
@@ -72,9 +67,7 @@ class AALAssetEngineResult:
         if not self.cashflows.empty and not set(self.cashflows["source"]).issubset(
             _ASSET_ENGINE_SOURCES
         ):
-            raise ValueError(
-                'cashflows source values must be "ACTUS" or "ACTUS_PROXY"'
-            )
+            raise ValueError('cashflows source values must be "ACTUS"')
 
         if not isinstance(self.contracts, tuple):
             raise TypeError(
@@ -119,10 +112,6 @@ def _resolve_specs(
     return validate_aal_asset_contract_specs(specs)
 
 
-def _empty_cashflow_dataframe() -> pd.DataFrame:
-    return pd.DataFrame(columns=list(CASHFLOW_COLUMNS))
-
-
 def _split_specs(
     specs: tuple[AssetSpec, ...],
 ) -> tuple[tuple[PAMSpec, ...], tuple[STKSpec, ...], tuple[CSHSpec, ...]]:
@@ -132,107 +121,8 @@ def _split_specs(
     return pam_specs, stk_specs, csh_specs
 
 
-def _synthesize_stk_dividends(stk_specs: tuple[STKSpec, ...]) -> tuple[CashflowRecord, ...]:
-    records: list[CashflowRecord] = []
-    for spec in stk_specs:
-        if spec.dividend_yield <= 0:
-            continue
-        for year in range(spec.start_year + 1, spec.divestment_year + 1):
-            current_market_value = (
-                spec.quantity
-                * spec.price_at_purchase
-                * ((1.0 + spec.market_value_growth) ** (year - spec.start_year))
-            )
-            records.append(
-                CashflowRecord(
-                    contractId=spec.contract_id,
-                    time=f"{year}-01-01T00:00:00",
-                    type="DV",
-                    payoff=spec.dividend_yield * current_market_value,
-                    nominalValue=current_market_value,
-                    currency=spec.currency,
-                    source="ACTUS_PROXY",
-                )
-            )
-    return tuple(records)
-
-
-def _synthesize_cash_interest(
-    csh_specs: tuple[CSHSpec, ...],
-    *,
-    horizon_years: int,
-) -> tuple[CashflowRecord, ...]:
-    records: list[CashflowRecord] = []
-    for spec in csh_specs:
-        if spec.assumed_return <= 0:
-            continue
-        for year in range(spec.start_year + 1, spec.start_year + horizon_years + 1):
-            records.append(
-                CashflowRecord(
-                    contractId=spec.contract_id,
-                    time=f"{year}-01-01T00:00:00",
-                    type="IP",
-                    payoff=spec.assumed_return * spec.nominal_value,
-                    nominalValue=spec.nominal_value,
-                    currency=spec.currency,
-                    source="ACTUS_PROXY",
-                )
-            )
-    return tuple(records)
-
-
-def _build_proxy_cashflows(
-    *,
-    stk_specs: tuple[STKSpec, ...],
-    csh_specs: tuple[CSHSpec, ...],
-    horizon_years: int,
-) -> pd.DataFrame:
-    records = (
-        *_synthesize_stk_dividends(stk_specs),
-        *_synthesize_cash_interest(csh_specs, horizon_years=horizon_years),
-    )
-    if not records:
-        return _empty_cashflow_dataframe()
-    return cashflow_records_to_dataframe(records)
-
-
-def _check_no_stk_dividend_double_counting(
-    *,
-    server_cashflows: pd.DataFrame,
-    proxy_cashflows: pd.DataFrame,
-    stk_specs: tuple[STKSpec, ...],
-) -> None:
-    if server_cashflows.empty or proxy_cashflows.empty:
-        return
-    stk_ids = {spec.contract_id for spec in stk_specs}
-    server_dv_ids = set(
-        server_cashflows.loc[
-            (server_cashflows["source"] == "ACTUS")
-            & (server_cashflows["type"] == "DV")
-            & (server_cashflows["contractId"].isin(stk_ids)),
-            "contractId",
-        ]
-    )
-    proxy_dv_ids = set(
-        proxy_cashflows.loc[
-            (proxy_cashflows["source"] == "ACTUS_PROXY")
-            & (proxy_cashflows["type"] == "DV"),
-            "contractId",
-        ]
-    )
-    double_counted = sorted(server_dv_ids & proxy_dv_ids)
-    if double_counted:
-        raise RuntimeError(
-            "STK dividend double-counting guard triggered for contract IDs: "
-            f"{double_counted}. The live ACTUS server emitted DV events while "
-            "the engine would also synthesize proxy DV events."
-        )
-
-
 def run_aal_asset_engine(
     specs: tuple[AssetSpec, ...] | list[AssetSpec] | None = None,
-    *,
-    horizon_years: int = 12,
 ) -> AALAssetEngineResult:
     """Run the required live AAL Asset Engine.
 
@@ -263,39 +153,21 @@ def run_aal_asset_engine(
         ) from exc
 
     try:
-        server_cashflows = aal_events_to_cashflow_dataframe(events_obj)
+        cashflows = aal_events_to_cashflow_dataframe(events_obj)
     except Exception as exc:
         raise RuntimeError(
             f"AAL event mapping to CashflowRecord schema failed: {exc}"
         ) from exc
 
-    proxy_cashflows = _build_proxy_cashflows(
-        stk_specs=stk_specs,
-        csh_specs=csh_specs,
-        horizon_years=horizon_years,
-    )
-    _check_no_stk_dividend_double_counting(
-        server_cashflows=server_cashflows,
-        proxy_cashflows=proxy_cashflows,
-        stk_specs=stk_specs,
-    )
-
-    cashflows = pd.concat(
-        [server_cashflows, proxy_cashflows],
-        ignore_index=True,
-    )
-    if cashflows.empty:
-        cashflows = _empty_cashflow_dataframe()
-    else:
+    if not cashflows.empty:
         cashflows = cashflows.sort_values(_SORT_COLUMNS, ignore_index=True)
     validate_cashflow_dataframe(cashflows)
 
-    n_server = len(server_cashflows)
-    n_proxy = len(proxy_cashflows)
+    n_server = len(cashflows)
     print(
         "[Phase2] dispatched "
         f"{len(pam_specs)} PAM + {len(stk_specs)} STK + {len(csh_specs)} CSH; "
-        f"received {n_server} server events; synthesized {n_proxy} proxy events"
+        f"received {n_server} server events"
     )
 
     version = _detect_aal_version()
@@ -306,7 +178,11 @@ def run_aal_asset_engine(
             f"Processed specs: {len(pam_specs)} PAM, {len(stk_specs)} STK, "
             f"{len(csh_specs)} CSH"
         ),
-        f"Server events: {n_server}; ACTUS_PROXY events: {n_proxy}",
+        "Asset-side events come from the live AAL server only. STK contracts "
+        "return TD events but no DV events on the public AAL reference server; "
+        "CSH contracts return no temporal events. These are documented "
+        "AAL/server limitations and are not compensated by synthetic cashflows.",
+        f"Server events: {n_server}",
     )
     return AALAssetEngineResult(
         cashflows=cashflows,

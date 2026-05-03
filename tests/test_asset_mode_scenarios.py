@@ -34,7 +34,7 @@ def _fake_specs():
             dividend_yield=0.02,
             market_value_growth=0.05,
         ),
-        CSHSpec("FAKE_CSH", 2026, 50_000.0, assumed_return=0.01),
+        CSHSpec("FAKE_CSH", 2026, 50_000.0),
     )
 
 
@@ -49,24 +49,6 @@ def _fake_asset_cashflows():
                 "nominalValue": 100_000.0,
                 "currency": "CHF",
                 "source": "ACTUS",
-            },
-            {
-                "contractId": "FAKE_STK",
-                "time": pd.Timestamp("2027-01-01"),
-                "type": "DV",
-                "payoff": 2_100.0,
-                "nominalValue": 105_000.0,
-                "currency": "CHF",
-                "source": "ACTUS_PROXY",
-            },
-            {
-                "contractId": "FAKE_CSH",
-                "time": pd.Timestamp("2027-01-01"),
-                "type": "IP",
-                "payoff": 500.0,
-                "nominalValue": 50_000.0,
-                "currency": "CHF",
-                "source": "ACTUS_PROXY",
             },
             {
                 "contractId": "FAKE_PAM",
@@ -92,7 +74,7 @@ def _fake_asset_cashflows():
 
 
 def _patch_fake_asset_engine(monkeypatch) -> None:
-    def fake_run_aal_asset_engine(asset_specs=None, *, horizon_years=12):
+    def fake_run_aal_asset_engine(asset_specs=None):
         return AALAssetEngineResult(
             cashflows=_fake_asset_cashflows(),
             contracts=_fake_specs(),
@@ -105,7 +87,7 @@ def _patch_fake_asset_engine(monkeypatch) -> None:
 
 def _assert_actus_mode_outputs(result, output_dir: Path, filenames: tuple[str, ...]):
     assert sorted(path.name for path in output_dir.glob("*.csv")) == sorted(filenames)
-    assert set(result.cashflows["source"]) == {"ACTUS", "ACTUS_PROXY", "BVG"}
+    assert set(result.cashflows["source"]) == {"ACTUS", "BVG"}
     trajectory_path = output_dir / "actus_asset_trajectory.csv"
     assert trajectory_path.exists()
     trajectory = pd.read_csv(trajectory_path)
