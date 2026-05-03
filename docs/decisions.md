@@ -119,3 +119,13 @@
 **Rationale:** EK 0105 is an older period mortality table and is used here only as a simplified educational input for a transparent prototype. For real Swiss pension fund valuation, BVG 2020 / VZ 2020 generation tables would be more appropriate because they reflect current actuarial practice more closely, but they are out of scope for this prototype layer.
 
 **Consequence:** Stage 2B is not a full actuarial valuation. It does not model active-member death, survivor benefits, disability, technical reserves, or mortality improvements. The mortality layer is limited to making retiree cashflows and retiree PV survival-weighted while preserving the Stage-2A population mechanics and the existing asset engine boundary.
+
+## ADR 014: Dynamic Parameters as Time-Varying Sequences
+
+**Status:** Accepted
+
+**Decision:** Stage 2C makes three parameters time-varying via `Sequence[float]` inputs with forward-fill: `conversion_rate` (UWS), `active_interest_rate` (BVG-Mindestzins), and `technical_interest_rate` (Diskontsatz). Other parameters remain scalar.
+
+**Rationale:** UWS reductions, BVG minimum-interest paths, and discount-rate adjustments are the three dominant Swiss pension-fund practice levers in this prototype layer. The BVG minimum interest is decided periodically, UWS reforms happen over time, and technical interest rates follow market-rate and valuation-practice trends. Other parameters have lower impact per implementation hour and remain scalar for Stage 2C.
+
+**Consequence:** Stage 2C runs parallel to Stage 2A. The engine is extended for dynamic UWS and active interest, and the valuation layer is extended for dynamic technical interest. Stage 2A remains git-diff-stable. Stochastic variants are deferred to Stage 2D / Stage 5, and combining mortality with dynamic parameters is left for a possible later Stage 2E.
