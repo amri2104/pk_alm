@@ -1,4 +1,4 @@
-"""Stage 2 — Entry Dynamics (BAUPLAN, not yet implemented).
+"""Stage 2 — Entry Dynamics.
 
 This module specifies how new active members join the pension fund each
 projection year. It produces a fresh ``ActiveCohort`` per year and, when
@@ -6,8 +6,7 @@ projection year. It produces a fresh ``ActiveCohort`` per year and, when
 incoming Freizügigkeitsleistung.
 
 Implementation status:
-    All public functions raise ``NotImplementedError("Stage 2 Bauplan:
-    implementation deferred")`` until Sprint 10.
+    Implemented in Sprint 10 as the Goal-1 Population Dynamics layer.
 
 Year-loop position:
     Entries are applied LAST in the Stage-2 year loop (step 6 in
@@ -140,7 +139,6 @@ def generate_entry_cohort_for_year(
 
     Raises:
         TypeError / ValueError on invalid inputs.
-        NotImplementedError: Always, until Sprint 10.
     """
     if not isinstance(assumptions, EntryAssumptions):
         raise TypeError(
@@ -183,8 +181,6 @@ def build_entry_cashflow_record(
     Returns:
         CashflowRecord of type ``"IN"`` with positive payoff, or ``None``.
 
-    Raises:
-        NotImplementedError: Always, until Sprint 10.
     """
     if not isinstance(cohort, ActiveCohort):
         raise TypeError(f"cohort must be ActiveCohort, got {type(cohort).__name__}")
@@ -227,8 +223,6 @@ def apply_entries_to_portfolio(
               identical to input if entry_count_per_year == 0).
             - Tuple of CashflowRecord IN events. May be empty.
 
-    Raises:
-        NotImplementedError: Always, until Sprint 10.
     """
     if not isinstance(portfolio, BVGPortfolioState):
         raise TypeError(

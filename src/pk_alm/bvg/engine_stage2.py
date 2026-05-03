@@ -1,12 +1,11 @@
-"""Stage 2 — BVG Engine v2 (BAUPLAN, not yet implemented).
+"""Stage 2 — BVG Engine v2.
 
 This is the Stage-2 counterpart to ``src/pk_alm/bvg/engine.py``. It runs the
 full Stage-2 year loop: PR/RP → turnover → projection → salary growth →
 retirement → entries.
 
 Implementation status:
-    All public functions raise ``NotImplementedError("Stage 2 Bauplan:
-    implementation deferred")`` until Sprint 10.
+    Implemented in Sprint 10 as the Goal-1 Population Dynamics layer.
 
 Architectural rule (ADR 010):
     The Stage-1 engine ``run_bvg_engine`` and its file ``engine.py`` MUST
@@ -236,7 +235,6 @@ def run_bvg_engine_stage2(
 
     Raises:
         TypeError / ValueError on invalid inputs.
-        NotImplementedError: Always, until Sprint 10.
 
     Stage-1 equivalence:
         With ``salary_growth_rate=0``, ``turnover_rate=0``, and

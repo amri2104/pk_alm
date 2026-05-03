@@ -1,15 +1,11 @@
-"""Stage 2 — Salary Dynamics (BAUPLAN, not yet implemented).
+"""Stage 2 — Salary Dynamics.
 
 This module specifies how active-cohort gross salaries evolve year over year.
 Stage 2 uses a single deterministic scenario-level scalar
 ``salary_growth_rate``.
 
 Implementation status:
-    All public functions in this module raise
-    ``NotImplementedError("Stage 2 Bauplan: implementation deferred")``.
-    The signatures, validation rules, docstrings, and module-level constants
-    are final. Sprint 10 (Stage-2 implementation sprint) will fill the
-    function bodies without changing the signatures.
+    Implemented in Sprint 10 as the Goal-1 Population Dynamics layer.
 
 Year-loop position:
     Salary growth is applied AFTER one-year projection (which advances age and
@@ -69,7 +65,6 @@ def apply_salary_growth_to_active_cohort(
             ``salary_growth_rate`` is bool / non-numeric.
         ValueError: If ``salary_growth_rate < 0``, ``> MAX_PERMITTED_SALARY_GROWTH_RATE``,
             or NaN.
-        NotImplementedError: Always, until Sprint 10.
     """
     if not isinstance(cohort, ActiveCohort):
         raise TypeError(f"cohort must be ActiveCohort, got {type(cohort).__name__}")
@@ -110,7 +105,6 @@ def apply_salary_growth_to_portfolio(
         TypeError: If ``portfolio`` is not a BVGPortfolioState.
         ValueError: If ``salary_growth_rate`` violates the bounds in
             :func:`apply_salary_growth_to_active_cohort`.
-        NotImplementedError: Always, until Sprint 10.
     """
     if not isinstance(portfolio, BVGPortfolioState):
         raise TypeError(

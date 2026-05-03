@@ -1,12 +1,11 @@
-"""Stage 2 Baseline Scenario (BAUPLAN, not yet implemented).
+"""Stage 2A Population Baseline Scenario.
 
 End-to-end Stage-2 demonstrator. Mirrors ``run_stage1_baseline`` but uses the
 Stage-2 engine, adds two new CSV outputs (demographic_summary.csv,
-cashflows_by_type.csv), and writes to ``outputs/stage2_baseline/``.
+cashflows_by_type.csv), and writes to ``outputs/stage2a_population/``.
 
 Implementation status:
-    All public functions raise ``NotImplementedError("Stage 2 Bauplan:
-    implementation deferred")`` until Sprint 10.
+    Implemented in Sprint 10 as the Goal-1 Population Dynamics layer.
 
 Architectural rule:
     The Stage-1 scenario ``run_stage1_baseline`` and its file
@@ -15,7 +14,7 @@ Architectural rule:
 
 Output protection:
     - ``outputs/stage1_baseline/*`` is NEVER written by Stage 2.
-    - ``outputs/stage2_baseline/*`` is the Stage-2 export root.
+    - ``outputs/stage2a_population/*`` is the Stage-2A export root.
     - Both trees coexist.
 """
 
@@ -162,15 +161,13 @@ def build_default_initial_portfolio_stage2():
     """Return the Stage-2 default starting portfolio.
 
     Stage 2 reuses the same default initial portfolio as Stage 1 to keep
-    the demographic effect comparable. Sprint 10 will import the
-    Stage-1 default builder rather than duplicate it.
+    the demographic effect comparable. Imports
+    ``build_default_stage1_portfolio`` for parity with the protected Stage-1
+    baseline.
 
     Returns:
         BVGPortfolioState with the same actives and retirees as
         ``stage1_baseline.build_default_initial_portfolio()``.
-
-    Raises:
-        NotImplementedError: Always, until Sprint 10.
     """
     return build_default_stage1_portfolio()
 
@@ -223,19 +220,18 @@ def run_stage2_baseline(
         turnover_rate: Stage-2 specific. Default 0.02.
         entry_assumptions: Stage-2 specific. ``None`` → default.
         output_dir: Directory for CSV outputs, or ``None`` for in-memory
-            only. Default ``"outputs/stage2_baseline"``.
+            only. Default ``"outputs/stage2a_population"``.
 
     Returns:
         Stage2BaselineResult with all DataFrames and the resolved output_dir.
 
     Raises:
         TypeError / ValueError on invalid inputs.
-        NotImplementedError: Always, until Sprint 10.
 
     Stage-1 protection:
         This function does not write to ``outputs/stage1_baseline/`` under
         any circumstances. The protection is enforced both by the explicit
-        ``output_dir`` default AND by a Sprint-10 test that calls
+        ``output_dir`` default AND by a regression test that calls
         ``run_stage2_baseline(...)`` and asserts ``outputs/stage1_baseline/``
         is unchanged.
     """

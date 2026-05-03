@@ -1,14 +1,11 @@
-"""Stage 2 — Turnover (BAUPLAN, not yet implemented).
+"""Stage 2 — Turnover.
 
 This module specifies how active members exit a Swiss pension fund mid-career
 through Austritt / Freizügigkeitsleistung. It emits ``EX`` cashflow records
 for departing vested capital.
 
 Implementation status:
-    All public functions in this module raise
-    ``NotImplementedError("Stage 2 Bauplan: implementation deferred")``.
-    The signatures, validation rules, docstrings, and module-level constants
-    are final. Sprint 10 will fill the function bodies.
+    Implemented in Sprint 10 as the Goal-1 Population Dynamics layer.
 
 Year-loop position:
     Turnover is applied AFTER PR/RP cashflow emission for the current state
@@ -154,7 +151,6 @@ def apply_turnover_to_active_cohort(
     Raises:
         TypeError: Argument-type errors.
         ValueError: Out-of-range rates, invalid event_date.
-        NotImplementedError: Always, until Sprint 10.
     """
     if not isinstance(cohort, ActiveCohort):
         raise TypeError(f"cohort must be ActiveCohort, got {type(cohort).__name__}")
@@ -217,7 +213,6 @@ def apply_turnover_to_portfolio(
     Raises:
         TypeError: Argument-type errors.
         ValueError: Out-of-range turnover_rate.
-        NotImplementedError: Always, until Sprint 10.
     """
     if not isinstance(portfolio, BVGPortfolioState):
         raise TypeError(
