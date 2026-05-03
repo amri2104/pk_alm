@@ -129,3 +129,23 @@
 **Rationale:** UWS reductions, BVG minimum-interest paths, and discount-rate adjustments are the three dominant Swiss pension-fund practice levers in this prototype layer. The BVG minimum interest is decided periodically, UWS reforms happen over time, and technical interest rates follow market-rate and valuation-practice trends. Other parameters have lower impact per implementation hour and remain scalar for Stage 2C.
 
 **Consequence:** Stage 2C runs parallel to Stage 2A. The engine is extended for dynamic UWS and active interest, and the valuation layer is extended for dynamic technical interest. Stage 2A remains git-diff-stable. Stochastic variants are deferred to Stage 2D / Stage 5, and combining mortality with dynamic parameters is left for a possible later Stage 2E.
+
+## ADR 015: Stage 2D Stochastic Scope Is Rates Only
+
+**Status:** Accepted
+
+**Decision:** Stage 2D makes only interest rates stochastic. The active BVG minimum interest rate drives the BVG year-loop, and the technical discount-rate path drives dynamic valuation. UWS, mortality, asset returns, salary growth, turnover, and contribution settings remain deterministic/scalar.
+
+**Rationale:** Interest rates are the dominant market-linked lever needed for the Goal-1 stochastic layer. Equity-return models, stochastic UWS, and stochastic mortality would add separate modelling choices and calibration requirements that are outside this sprint's educational prototype scope.
+
+**Consequence:** Stage 2D is a parallel stochastic-rate layer over Stage 2C. It does not alter Stage 1, Stage 2A, Stage 2B, or Stage 2C engines and scenarios. Stochastic equity returns, stochastic UWS, stochastic mortality, and mortality-plus-dynamic-rate combinations remain deferred to later stages.
+
+## ADR 016: Independent Active and Technical Rate Paths
+
+**Status:** Accepted
+
+**Decision:** Stage 2D simulates active BVG minimum-interest paths and technical discount-rate paths independently, using separate short-rate model instances and seeds (`seed` and `seed + 1`).
+
+**Rationale:** In practice these rates are related, but modelling correlation would require additional assumptions, a correlation matrix, and coupled sampling logic. For this Goal-1 sensitivity layer, independent paths keep the mechanics transparent while still exposing the asset-liability sensitivity to both rate levers.
+
+**Consequence:** Stage 2D outputs should be interpreted as independent active/technical rate scenarios, not a calibrated joint Swiss pension-fund rate model. Correlated rates are deferred to a later Stage 2E or Goal-2 stochastic extension.
