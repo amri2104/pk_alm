@@ -1,0 +1,18 @@
+{
+    "start_year": 2024,
+    "projection_horizon": 10,
+    "retirement_age": 65,
+    "technical_interest_rate": 0.02,
+    "conversion_rate": 0.05,
+    "contribution_rate": 0.10,
+    "salary_escalation_rate": 0.01,
+    "withdrawal_rate": 0.02,
+    "new_entrants_per_year": 5,
+    "entry_age": 25,
+    "entry_salary": 80000.0,
+    "female_fraction": 0.5,
+    "mortality_table_id": "EK0105",
+    "active_mortality_mode": "expected",
+    "retiree_mortality_mode": "expected",
+    "decrement_mode": "expected"
+}

@@ -16,6 +16,7 @@ class ActiveCohort:
     count: int
     gross_salary_per_person: float
     capital_active_per_person: float
+    gender: str = "mixed"
 
     def __post_init__(self) -> None:
         if not isinstance(self.cohort_id, str) or not self.cohort_id.strip():
@@ -67,6 +68,7 @@ class RetiredCohort:
     count: int
     annual_pension_per_person: float
     capital_rente_per_person: float
+    gender: str = "mixed"
 
     def __post_init__(self) -> None:
         if not isinstance(self.cohort_id, str) or not self.cohort_id.strip():
