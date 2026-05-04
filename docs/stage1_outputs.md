@@ -92,9 +92,9 @@ next to a calendar field.
   not a return forecast; positive return scenarios may be passed explicitly.
 - `total_stage1_liability` remains a Stage-1 proxy and excludes technical
   reserves.
-- Former time-grid and monthly PR/RP feasibility utilities have been moved to
-  `archive/`. They do not add output files or alter these seven default CSV
-  outputs.
+- Former time-grid and monthly PR/RP feasibility utilities are no longer part
+  of the active package. They do not add output files or alter these seven
+  default CSV outputs.
 
 ## Interpretation Warnings
 
@@ -116,7 +116,7 @@ next to a calendar field.
   BVG and AAL asset-engine cashflows in memory through the shared
   `CashflowRecord` schema, but it does not rewrite, replace, or extend the
   Stage-1 output files documented here.
-- Archived time-grid and monthly PR/RP feasibility utilities do not alter the
+- Former time-grid and monthly PR/RP feasibility utilities do not alter the
   seven default Stage-1 outputs. The annual baseline remains the reference.
 - No technical reserves yet.
 - `total_stage1_liability` is a deterministic Stage-1 proxy, not a full

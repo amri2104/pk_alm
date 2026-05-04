@@ -100,16 +100,17 @@ seven Stage-1 CSV outputs, and does not install, import, or call AAL. The
 deterministic BVG baseline remains the reference Stage-1 scenario.
 
 The former Sprint 4B deterministic ACTUS-style fixed-rate bond fixtures have
-been moved to `archive/`. They are no longer part of the active package.
+been removed from the active package.
 
-The former Sprint 4C asset overlay helper has been moved to `archive/`.
+The former Sprint 4C asset overlay helper has also been removed.
 The active package path for integrated asset/liability cashflows is the Full
 ALM scenario layer, not the protected Stage-1 baseline.
 
 Sprint 5A now leaves `src/pk_alm/actus_asset_engine/aal_probe.py` as a small
 `get_aal_module()` import helper for the required AAL dependency.
 
-The former Sprint 5B API-surface introspection helper has been archived.
+The former Sprint 5B API-surface introspection helper has been removed from
+the active package.
 Sprint 5C records real-AAL smoke-test findings: AAL `1.0.12` can construct
 `PAM` and `Portfolio` objects in a temporary venv, and useful public symbols
 include `PAM`, `Portfolio`, `CashFlowStream`, `PublicActusService`,
@@ -161,15 +162,15 @@ re-validates the two identities row by row, and rejects multiple currencies.
 
 ### Time-Grid Feasibility
 
-The former standalone time-grid feasibility helper has been moved to
-`archive/`. The annual Stage-1 baseline remains the reference and no monthly
+The former standalone time-grid feasibility helper is no longer part of the
+active package. The annual Stage-1 baseline remains the reference and no monthly
 simulation layer is active in the package.
 
 ### Monthly PR/RP Cashflow Generation and Reconciliation
 
 The former monthly BVG PR/RP generator and monthly-vs-annual reconciliation
-utility have also been moved to `archive/`. They are no longer active package
-modules and do not affect the seven protected Stage-1 CSV outputs.
+utility are no longer part of the active package and do not affect the seven
+protected Stage-1 CSV outputs.
 
 ### AAL Asset Boundary
 
@@ -184,8 +185,8 @@ the seven default Stage-1 CSV outputs.
 
 ### Pension Fund AAL Asset Demo
 
-The former Sprint 7B pension fund AAL asset demo has been moved to
-`archive/`. The active package path is the AAL Asset Engine and Full ALM
+The former Sprint 7B pension fund AAL asset demo is no longer part of the
+active package. The active package path is the AAL Asset Engine and Full ALM
 Scenario.
 
 This historical demo showed the intended bridge between the custom BVG

@@ -19,16 +19,15 @@ transparent liability proxy with deterministic funding-ratio reporting.
 - AAL (`awesome-actus-lib>=1.0.12`) is a required dependency for asset-side
   ACTUS work.
 - The former fixed-rate fixture, overlay, availability-probe, and API
-  introspection support layers have been archived under `archive/`.
+  introspection support layers are no longer part of the active package.
 - Former standalone annual/monthly time-grid and monthly PR/RP feasibility
-  utilities have been archived under `archive/`; they are no longer part of
-  the active `pk_alm` package.
+  utilities are no longer part of the active `pk_alm` package.
 - AAL asset construction helpers
   (`src/pk_alm/actus_asset_engine/aal_asset_boundary.py`)
   implemented for real AAL `PAM` and `Portfolio` objects.
-- The former separate pension fund AAL asset demo has been archived under
-  `archive/`; the active AAL integration path is the AAL Asset Engine and
-  Full ALM Scenario.
+- The former separate pension fund AAL asset demo is no longer part of the
+  active package; the active AAL integration path is the AAL Asset Engine
+  and Full ALM Scenario.
 - Multi-contract AAL/ACTUS asset portfolio layer
   (`src/pk_alm/actus_asset_engine/aal_asset_portfolio.py`) implemented:
   per-contract specs map into dynamic AAL PAM terms and real AAL `Portfolio`
@@ -110,15 +109,13 @@ Start the Goal-1 ALM Cockpit:
 python3 -m streamlit run examples/streamlit_full_alm_app.py
 ```
 
-### Cockpit Screenshot
+### Cockpit Design
 
 The cockpit is a Bloomberg-Terminal-Lite dark-theme dashboard with six
 analyst-workflow tabs: Overview, Configure, Run, Results & Risk, Stress Lab,
 Methodology. Plotly charts (status-banded funding ratio, net-cashflow timeline
 with liquidity inflection marker, stacked cashflow-by-source, assets-vs-liabilities
 with surplus/deficit overlay) render on a navy palette with gold accents.
-
-![Cockpit Overview](docs/screenshots/cockpit_overview.png)
 
 The cockpit consumes the Goal-1 advanced ALM workflow and falls back to a
 deterministic asset proxy when the live AAL/ACTUS service is unreachable.
@@ -219,10 +216,10 @@ The current implementation is the **deterministic Stage-1 baseline**:
   cashflow conversion.
 - AAL is required for asset-side ACTUS work and is used through
   `PublicActusService.generateEvents(...)`.
-- Former fixed-rate fixture, overlay, and API inspection helpers are archived
-  under `archive/` and are not part of the active package.
-- Former time-grid and monthly PR/RP feasibility helpers are archived under
-  `archive/` and are not part of the active package or default Stage-1 run.
+- Former fixed-rate fixture, overlay, and API inspection helpers are no
+  longer part of the active package.
+- Former time-grid and monthly PR/RP feasibility helpers are no longer part
+  of the active package or default Stage-1 run.
 - `src/pk_alm/actus_asset_engine/aal_asset_boundary.py` constructs real AAL
   `PAM` and `Portfolio` objects.
 - `src/pk_alm/actus_asset_engine/aal_asset_portfolio.py` provides a
