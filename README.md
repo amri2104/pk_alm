@@ -75,15 +75,38 @@ python3 -m pip install -e ".[app]"
 python3 -m streamlit run examples/streamlit_full_alm_app.py
 ```
 
-For the Streamlit UI, install the app extra in addition to the required core
-dependencies:
+## How to run the Streamlit app
+
+Install the app extra in addition to the required core dependencies:
 
 ```bash
 python3 -m pip install -e ".[app]"
 ```
 
-The `app` extra installs only the Streamlit UI dependency. AAL is part of the
-main project dependencies.
+Start the Goal-1 ALM Cockpit:
+
+```bash
+python3 -m streamlit run examples/streamlit_full_alm_app.py
+```
+
+### Cockpit Screenshot
+
+The cockpit is a Bloomberg-Terminal-Lite dark-theme dashboard with six
+analyst-workflow tabs: Overview, Configure, Run, Results & Risk, Stress Lab,
+Methodology. Plotly charts (status-banded funding ratio, net-cashflow timeline
+with liquidity inflection marker, stacked cashflow-by-source, assets-vs-liabilities
+with surplus/deficit overlay) render on a navy palette with gold accents.
+
+![Cockpit Overview](docs/screenshots/cockpit_overview.png)
+
+The cockpit consumes the Goal-1 advanced ALM workflow and falls back to a
+deterministic asset proxy when the live AAL/ACTUS service is unreachable.
+Stochastic Rates uses the external `stochastic_rates` package; if it is not
+installed, install it separately, for example with
+`pip install -e ../stochastic_rates`.
+
+The `app` extra installs Streamlit and Plotly. AAL is part of the main
+project dependencies.
 
 Run the integrated Full ALM scenario from Python by calling
 `run_full_alm_scenario(...)`. The asset path always uses the required live
