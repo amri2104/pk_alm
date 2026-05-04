@@ -2,9 +2,9 @@ import math
 
 import pandas as pd
 import pytest
-from pk_alm.bvg.cohorts import ActiveCohort, RetiredCohort
-from pk_alm.bvg.engine import BVGEngineResult, run_bvg_engine
-from pk_alm.bvg.portfolio import BVGPortfolioState
+from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort, RetiredCohort
+from pk_alm.bvg_liability_engine.orchestration.engine import BVGEngineResult, run_bvg_engine
+from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
 from pk_alm.cashflows.schema import CASHFLOW_COLUMNS, validate_cashflow_dataframe
 
 RATE = 0.0176

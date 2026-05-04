@@ -125,20 +125,22 @@ Not implemented. Dark theme only. Documented as out-of-scope.
   assertion, and AppTest title check. All 8 tests green.
 - `tests/test_goal1_advanced_workflow.py` — unchanged from earlier work, 14
   tests green.
-- Full repo suite: `1000 passed, 12 skipped`.
+- Full repo suite: `1007 passed, 12 skipped`.
 
 ## Frozen-Files Status
 
 Confirmed untouched during the redesign:
 
-- `src/pk_alm/bvg/`
+- `src/pk_alm/bvg_liability_engine/`
 - `src/pk_alm/scenarios/` (the `stage1_baseline.py` import location was
   restored to module level — pure import refactor, no calc-logic change)
-- `src/pk_alm/analytics/`
+- `src/pk_alm/alm_analytics_engine/`
 - `src/pk_alm/cashflows/schema.py`
-- `src/pk_alm/assets/`
-- `src/pk_alm/adapters/`
+- `src/pk_alm/actus_asset_engine/`
 - `outputs/stage*` directories
+
+The legacy shim packages were removed after the canonical engine imports were
+adopted.
 
 ## Bug-Fix Sweep (Post-Redesign)
 

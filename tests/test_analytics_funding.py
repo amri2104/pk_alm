@@ -3,14 +3,14 @@ import math
 import pandas as pd
 import pytest
 
-from pk_alm.analytics.funding import (
+from pk_alm.alm_analytics_engine.funding import (
     FUNDING_RATIO_COLUMNS,
     build_funding_ratio_trajectory,
     calculate_funding_ratio,
     validate_funding_ratio_dataframe,
 )
-from pk_alm.assets.deterministic import ASSET_SNAPSHOT_COLUMNS
-from pk_alm.bvg.valuation import VALUATION_COLUMNS
+from pk_alm.actus_asset_engine.deterministic import ASSET_SNAPSHOT_COLUMNS
+from pk_alm.bvg_liability_engine.pension_logic.valuation import VALUATION_COLUMNS
 
 
 def _asset_df(closing_values, projection_years=None):

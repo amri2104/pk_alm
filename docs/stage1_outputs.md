@@ -22,7 +22,7 @@ python3 -m pytest
 Expected current test status:
 
 ```text
-840 passed, 1 skipped
+1007 passed, 12 skipped
 ```
 
 Run the deterministic Stage-1 baseline example:

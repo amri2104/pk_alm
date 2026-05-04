@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from pk_alm.adapters.aal_asset_boundary import (
+from pk_alm.actus_asset_engine.aal_asset_boundary import (
     DEFAULT_PAM_CONTRACT_ID,
     DEFAULT_PAM_COUPON_RATE,
     DEFAULT_PAM_CURRENCY,
@@ -14,8 +14,8 @@ from pk_alm.adapters.aal_asset_boundary import (
     build_aal_portfolio,
     build_aal_stk_contract,
 )
-from pk_alm.adapters.aal_asset_portfolio import CSHSpec, STKSpec
-from pk_alm.adapters.aal_probe import get_aal_module
+from pk_alm.actus_asset_engine.aal_asset_portfolio import CSHSpec, STKSpec
+from pk_alm.actus_asset_engine.aal_probe import get_aal_module
 from pk_alm.scenarios.stage1_baseline import run_stage1_baseline
 
 

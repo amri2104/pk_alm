@@ -1,6 +1,6 @@
 import inspect
 
-from pk_alm.adapters.aal_probe import get_aal_module
+from pk_alm.actus_asset_engine.aal_probe import get_aal_module
 
 
 def _minimal_pam_terms() -> dict:

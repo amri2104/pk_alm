@@ -49,10 +49,13 @@ Technical reserves are not implemented in Stage 1. They are deferred to Stage 2+
 
 Stage 1 is organised around three engines and one integration contract:
 
-1. BVG Liability Engine: `src/pk_alm/bvg/`
-2. AAL Asset Engine: `src/pk_alm/assets/aal_engine.py`
-3. ALM Analytics Engine: `src/pk_alm/analytics/`
+1. BVG Liability Engine: `src/pk_alm/bvg_liability_engine/`
+2. AAL Asset Engine: `src/pk_alm/actus_asset_engine/`
+3. ALM Analytics Engine: `src/pk_alm/alm_analytics_engine/`
 4. Shared CashflowRecord schema: `src/pk_alm/cashflows/schema.py`
+
+Legacy shim packages were removed from the active tree after tests moved to
+the canonical engine imports.
 
 The protected Stage-1 reference scenario is `src/pk_alm/scenarios/stage1_baseline.py`. The integrated Full ALM scenario in `src/pk_alm/scenarios/full_alm_scenario.py` is separate and does not replace the Stage-1 baseline.
 
@@ -93,7 +96,7 @@ python3 -m pytest
 Current confirmed result:
 
 ```text
-840 passed, 1 skipped
+1007 passed, 12 skipped
 ```
 
 Stage-1 protection is covered by tests for:

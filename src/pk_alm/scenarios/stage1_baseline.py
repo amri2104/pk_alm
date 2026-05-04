@@ -16,33 +16,33 @@ from typing import Literal
 
 import pandas as pd
 
-from pk_alm.adapters.aal_asset_portfolio import AssetSpec
-from pk_alm.analytics.cashflows import (
+from pk_alm.actus_asset_engine.aal_asset_portfolio import AssetSpec
+from pk_alm.alm_analytics_engine.cashflows import (
     find_liquidity_inflection_year,
     summarize_cashflows_by_year,
     validate_annual_cashflow_dataframe,
 )
-from pk_alm.analytics.funding import (
+from pk_alm.alm_analytics_engine.funding import (
     build_funding_ratio_trajectory,
     validate_funding_ratio_dataframe,
 )
-from pk_alm.analytics.funding_summary import (
+from pk_alm.alm_analytics_engine.funding_summary import (
     funding_summary_to_dataframe,
     summarize_funding_ratio,
     validate_funding_summary_dataframe,
 )
-from pk_alm.assets.deterministic import (
+from pk_alm.actus_asset_engine.deterministic import (
     DeterministicAssetSnapshot,
     asset_snapshots_to_dataframe,
     build_deterministic_asset_trajectory,
     validate_asset_dataframe,
 )
-from pk_alm.assets.aal_engine import run_aal_asset_engine
-from pk_alm.assets.actus_trajectory import compute_actus_asset_trajectory
-from pk_alm.bvg.cohorts import ActiveCohort, RetiredCohort
-from pk_alm.bvg.engine import BVGEngineResult, run_bvg_engine
-from pk_alm.bvg.portfolio import BVGPortfolioState
-from pk_alm.bvg.valuation import (
+from pk_alm.actus_asset_engine.aal_engine import run_aal_asset_engine
+from pk_alm.actus_asset_engine.actus_trajectory import compute_actus_asset_trajectory
+from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort, RetiredCohort
+from pk_alm.bvg_liability_engine.orchestration.engine import BVGEngineResult, run_bvg_engine
+from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
+from pk_alm.bvg_liability_engine.pension_logic.valuation import (
     validate_valuation_dataframe,
     value_portfolio_states,
 )

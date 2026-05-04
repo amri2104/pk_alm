@@ -2,25 +2,25 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-from pk_alm.analytics.cashflows import (
+from pk_alm.alm_analytics_engine.cashflows import (
     find_liquidity_inflection_year,
     validate_annual_cashflow_dataframe,
 )
-from pk_alm.analytics.funding import (
+from pk_alm.alm_analytics_engine.funding import (
     FUNDING_RATIO_COLUMNS,
     validate_funding_ratio_dataframe,
 )
-from pk_alm.analytics.funding_summary import (
+from pk_alm.alm_analytics_engine.funding_summary import (
     FUNDING_SUMMARY_COLUMNS,
     validate_funding_summary_dataframe,
 )
-from pk_alm.assets.deterministic import (
+from pk_alm.actus_asset_engine.deterministic import (
     ASSET_SNAPSHOT_COLUMNS,
     validate_asset_dataframe,
 )
-from pk_alm.bvg.engine import BVGEngineResult
-from pk_alm.bvg.portfolio import BVGPortfolioState
-from pk_alm.bvg.valuation import validate_valuation_dataframe
+from pk_alm.bvg_liability_engine.orchestration.engine import BVGEngineResult
+from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
+from pk_alm.bvg_liability_engine.pension_logic.valuation import validate_valuation_dataframe
 from pk_alm.cashflows.schema import validate_cashflow_dataframe
 from pk_alm.scenarios.stage1_baseline import (
     Stage1BaselineResult,

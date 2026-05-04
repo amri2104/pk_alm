@@ -13,32 +13,32 @@ from typing import Literal
 
 import pandas as pd
 
-from pk_alm.adapters.aal_asset_portfolio import AssetSpec
-from pk_alm.analytics.cashflows import (
+from pk_alm.actus_asset_engine.aal_asset_portfolio import AssetSpec
+from pk_alm.alm_analytics_engine.cashflows import (
     find_liquidity_inflection_year,
     summarize_cashflows_by_year,
     validate_annual_cashflow_dataframe,
 )
-from pk_alm.analytics.funding import (
+from pk_alm.alm_analytics_engine.funding import (
     build_funding_ratio_trajectory,
     validate_funding_ratio_dataframe,
 )
-from pk_alm.analytics.funding_summary import (
+from pk_alm.alm_analytics_engine.funding_summary import (
     funding_summary_to_dataframe,
     summarize_funding_ratio,
     validate_funding_summary_dataframe,
 )
-from pk_alm.assets.deterministic import (
+from pk_alm.actus_asset_engine.deterministic import (
     build_deterministic_asset_trajectory,
     validate_asset_dataframe,
 )
-from pk_alm.bvg.cohorts import ActiveCohort, RetiredCohort
-from pk_alm.bvg.dynamic_parameters import DynamicParameter, expand_parameter
-from pk_alm.bvg.engine_stage2c import Stage2CEngineResult, run_bvg_engine_stage2c
-from pk_alm.bvg.entry_dynamics import EntryAssumptions
-from pk_alm.bvg.portfolio import BVGPortfolioState
-from pk_alm.bvg.valuation import validate_valuation_dataframe
-from pk_alm.bvg.valuation_dynamic import value_portfolio_states_dynamic
+from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort, RetiredCohort
+from pk_alm.bvg_liability_engine.actuarial_assumptions.dynamic_parameters import DynamicParameter, expand_parameter
+from pk_alm.bvg_liability_engine.orchestration.engine_stage2c import Stage2CEngineResult, run_bvg_engine_stage2c
+from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import EntryAssumptions
+from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
+from pk_alm.bvg_liability_engine.pension_logic.valuation import validate_valuation_dataframe
+from pk_alm.bvg_liability_engine.pension_logic.valuation_dynamic import value_portfolio_states_dynamic
 from pk_alm.cashflows.schema import validate_cashflow_dataframe
 from pk_alm.scenarios.result_summary import (
     build_scenario_result_summary,

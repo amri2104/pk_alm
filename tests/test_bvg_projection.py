@@ -1,7 +1,7 @@
 import pytest
-from pk_alm.bvg.cohorts import ActiveCohort, RetiredCohort
-from pk_alm.bvg.portfolio import BVGPortfolioState
-from pk_alm.bvg.projection import (
+from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort, RetiredCohort
+from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
+from pk_alm.bvg_liability_engine.pension_logic.projection import (
     project_active_cohort_one_year,
     project_portfolio_one_year,
     project_retired_cohort_one_year,

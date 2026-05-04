@@ -18,15 +18,15 @@ from pathlib import Path
 
 import pandas as pd
 
-from pk_alm.analytics.alm_kpis import (
+from pk_alm.alm_analytics_engine.alm_kpis import (
     ALMKPISummary,
     alm_kpi_summary_to_dataframe,
     build_alm_kpi_summary,
     build_cashflow_by_source_plot_table,
     build_net_cashflow_plot_table,
 )
-from pk_alm.analytics.cashflows import validate_annual_cashflow_dataframe
-from pk_alm.analytics.funding import validate_funding_ratio_dataframe
+from pk_alm.alm_analytics_engine.cashflows import validate_annual_cashflow_dataframe
+from pk_alm.alm_analytics_engine.funding import validate_funding_ratio_dataframe
 from pk_alm.cashflows.schema import validate_cashflow_dataframe
 from pk_alm.scenarios.full_alm_scenario import (
     FullALMScenarioResult,

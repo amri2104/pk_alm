@@ -2,9 +2,9 @@ import math
 
 import pandas as pd
 import pytest
-from pk_alm.bvg.cohorts import ActiveCohort, RetiredCohort
-from pk_alm.bvg.portfolio import BVGPortfolioState
-from pk_alm.bvg.valuation import (
+from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort, RetiredCohort
+from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
+from pk_alm.bvg_liability_engine.pension_logic.valuation import (
     VALUATION_COLUMNS,
     BVGValuationSnapshot,
     validate_valuation_dataframe,

@@ -1,13 +1,13 @@
 import pytest
 
-from pk_alm.bvg.cohorts import RetiredCohort
-from pk_alm.bvg.mortality import EKF_0105, MORTALITY_MODE_EK0105, load_ek0105_table
-from pk_alm.bvg.mortality_valuation import (
+from pk_alm.bvg_liability_engine.domain_models.cohorts import RetiredCohort
+from pk_alm.bvg_liability_engine.actuarial_assumptions.mortality import EKF_0105, MORTALITY_MODE_EK0105, load_ek0105_table
+from pk_alm.bvg_liability_engine.actuarial_assumptions.mortality_valuation import (
     mortality_weighted_retiree_pv_per_person,
     value_portfolio_state_stage2b,
 )
-from pk_alm.bvg.portfolio import BVGPortfolioState
-from pk_alm.bvg.valuation import value_portfolio_state
+from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
+from pk_alm.bvg_liability_engine.pension_logic.valuation import value_portfolio_state
 
 
 def test_mortality_weighted_pv_is_below_deterministic_terminal_age_pv() -> None:

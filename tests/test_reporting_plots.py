@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 from matplotlib.figure import Figure
 
-from pk_alm.analytics.alm_kpis import (
+from pk_alm.alm_analytics_engine.alm_kpis import (
     build_cashflow_by_source_plot_table,
     build_net_cashflow_plot_table,
 )

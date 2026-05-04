@@ -3,7 +3,7 @@ import copy
 import pandas as pd
 import pytest
 
-from pk_alm.adapters.actus_adapter import (
+from pk_alm.actus_asset_engine.actus_adapter import (
     ACTUS_SOURCE,
     actus_event_to_cashflow_record,
     actus_events_to_cashflow_dataframe,

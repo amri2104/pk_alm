@@ -19,12 +19,12 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from pk_alm.adapters.aal_asset_portfolio import AssetSpec
-from pk_alm.analytics.cashflows import (
+from pk_alm.actus_asset_engine.aal_asset_portfolio import AssetSpec
+from pk_alm.alm_analytics_engine.cashflows import (
     summarize_cashflows_by_year,
     validate_annual_cashflow_dataframe,
 )
-from pk_alm.assets.aal_engine import (
+from pk_alm.actus_asset_engine.aal_engine import (
     AALAssetEngineResult,
     run_aal_asset_engine,
 )

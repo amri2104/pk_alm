@@ -134,7 +134,7 @@ def test_scenario_presets_run_without_error(preset: str, tmp_path: Path) -> None
 
 
 def test_assumption_income_cashflows_emitted_per_yield_year() -> None:
-    from pk_alm.adapters.aal_asset_portfolio import STKSpec
+    from pk_alm.actus_asset_engine.aal_asset_portfolio import STKSpec
     from pk_alm.workflows.goal1_advanced_workflow import (
         _build_assumption_income_cashflows,
     )
@@ -160,7 +160,7 @@ def test_assumption_income_cashflows_emitted_per_yield_year() -> None:
 
 
 def test_assumption_income_cashflows_skips_zero_yield_specs() -> None:
-    from pk_alm.adapters.aal_asset_portfolio import STKSpec
+    from pk_alm.actus_asset_engine.aal_asset_portfolio import STKSpec
     from pk_alm.workflows.goal1_advanced_workflow import (
         _build_assumption_income_cashflows,
     )

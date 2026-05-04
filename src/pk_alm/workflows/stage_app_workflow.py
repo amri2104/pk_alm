@@ -14,7 +14,7 @@ from typing import Any, Callable
 
 import pandas as pd
 
-from pk_alm.bvg.entry_dynamics import EntryAssumptions
+from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import EntryAssumptions
 
 MODE_CORE = "core"
 MODE_FULL_ALM_ACTUS = "full_alm_actus"

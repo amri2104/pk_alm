@@ -3,8 +3,8 @@
 import pandas as pd
 import pytest
 
-from pk_alm.adapters.aal_asset_portfolio import CSHSpec, PAMSpec, STKSpec
-from pk_alm.assets.actus_trajectory import (
+from pk_alm.actus_asset_engine.aal_asset_portfolio import CSHSpec, PAMSpec, STKSpec
+from pk_alm.actus_asset_engine.actus_trajectory import (
     ACTUS_ASSET_TRAJECTORY_COLUMNS,
     compute_actus_asset_trajectory,
 )

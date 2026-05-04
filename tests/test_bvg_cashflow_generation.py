@@ -2,12 +2,12 @@ import math
 
 import pandas as pd
 import pytest
-from pk_alm.bvg.cashflow_generation import (
+from pk_alm.bvg_liability_engine.pension_logic.cashflow_generation import (
     generate_bvg_cashflow_dataframe_for_state,
     generate_bvg_cashflow_records_for_state,
 )
-from pk_alm.bvg.cohorts import ActiveCohort, RetiredCohort
-from pk_alm.bvg.portfolio import BVGPortfolioState
+from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort, RetiredCohort
+from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
 from pk_alm.cashflows.schema import CASHFLOW_COLUMNS, validate_cashflow_dataframe
 
 EVENT_DATE = "2026-12-31"

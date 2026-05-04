@@ -1,5 +1,5 @@
 import pytest
-from pk_alm.bvg.formulas import (
+from pk_alm.bvg_liability_engine.pension_logic.formulas import (
     MAX_COORDINATED_SALARY,
     MIN_COORDINATED_SALARY,
     calculate_age_credit,

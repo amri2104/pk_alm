@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pandas as pd
 import pytest
-from pk_alm.analytics.cashflows import (
+from pk_alm.alm_analytics_engine.cashflows import (
     ANNUAL_CASHFLOW_COLUMNS,
     find_liquidity_inflection_year,
     summarize_cashflows_by_year,

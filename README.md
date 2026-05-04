@@ -23,21 +23,25 @@ transparent liability proxy with deterministic funding-ratio reporting.
 - Former standalone annual/monthly time-grid and monthly PR/RP feasibility
   utilities have been archived under `archive/`; they are no longer part of
   the active `pk_alm` package.
-- AAL asset construction helpers (`src/pk_alm/adapters/aal_asset_boundary.py`)
+- AAL asset construction helpers
+  (`src/pk_alm/actus_asset_engine/aal_asset_boundary.py`)
   implemented for real AAL `PAM` and `Portfolio` objects.
 - The former separate pension fund AAL asset demo has been archived under
   `archive/`; the active AAL integration path is the AAL Asset Engine and
   Full ALM Scenario.
 - Multi-contract AAL/ACTUS asset portfolio layer
-  (`src/pk_alm/adapters/aal_asset_portfolio.py`) implemented: per-contract
-  specs map into dynamic AAL PAM terms and real AAL `Portfolio` construction.
-- AAL Asset Engine v1 (`src/pk_alm/assets/aal_engine.py`) implemented. AAL
-  is the required strategic asset engine for ACTUS cashflow generation.
+  (`src/pk_alm/actus_asset_engine/aal_asset_portfolio.py`) implemented:
+  per-contract specs map into dynamic AAL PAM terms and real AAL `Portfolio`
+  construction.
+- AAL Asset Engine v1 (`src/pk_alm/actus_asset_engine/aal_engine.py`)
+  implemented. AAL is the required strategic asset engine for ACTUS cashflow
+  generation.
 - Full ALM Scenario (`src/pk_alm/scenarios/full_alm_scenario.py`)
   implemented: combines BVG liability cashflows with AAL asset-engine
   cashflows through the shared `CashflowRecord` schema without mutating the
   protected Stage-1 outputs.
-- ALM KPI / plot-ready output layer (`src/pk_alm/analytics/alm_kpis.py`)
+- ALM KPI / plot-ready output layer
+  (`src/pk_alm/alm_analytics_engine/alm_kpis.py`)
   implemented: KPI summary, cashflow-by-source table, and net-cashflow table.
   Sprint 8 adds a separate reporting package for CSV export, matplotlib PNG
   plots, and caller-supplied benchmark/plausibility tables.
@@ -46,7 +50,24 @@ transparent liability proxy with deterministic funding-ratio reporting.
   source modules, tests, examples, docs, or protected Stage-1 outputs.
 - The Stage-1 baseline scenario is available as both a library function and a
   manual-run script.
-- Current tests: **840 passed, 1 skipped**.
+- Current tests: **1007 passed, 12 skipped**.
+
+## Package Architecture
+
+The active code now exposes the thesis architecture through canonical engine
+packages:
+
+- BVG Liability Engine — `src/pk_alm/bvg_liability_engine/`
+- ACTUS Asset Engine — `src/pk_alm/actus_asset_engine/`
+- ALM Analytics Engine — `src/pk_alm/alm_analytics_engine/`
+- Shared Cashflow Schema — `src/pk_alm/cashflows/schema.py`
+- Workflow / Scenarios — `src/pk_alm/workflows/` and
+  `src/pk_alm/scenarios/`
+- Streamlit Cockpit — `examples/streamlit_full_alm_app.py` and
+  `examples/_cockpit/`
+
+Legacy shim packages have been removed from the active tree, so new work
+should import from the canonical engine packages above.
 
 ## Quick Run
 
@@ -202,25 +223,27 @@ The current implementation is the **deterministic Stage-1 baseline**:
   under `archive/` and are not part of the active package.
 - Former time-grid and monthly PR/RP feasibility helpers are archived under
   `archive/` and are not part of the active package or default Stage-1 run.
-- `src/pk_alm/adapters/aal_asset_boundary.py` constructs real AAL `PAM` and
-  `Portfolio` objects.
-- `src/pk_alm/adapters/aal_asset_portfolio.py` provides a multi-contract
-  AAL/ACTUS asset portfolio layer. It is not wired into the default Stage-1
-  baseline and is not a calibrated real pension fund asset allocation.
-- `src/pk_alm/assets/aal_engine.py` is the strategic asset-side engine. Its
-  live AAL path raises clearly when the service-backed event path is
-  unavailable.
+- `src/pk_alm/actus_asset_engine/aal_asset_boundary.py` constructs real AAL
+  `PAM` and `Portfolio` objects.
+- `src/pk_alm/actus_asset_engine/aal_asset_portfolio.py` provides a
+  multi-contract AAL/ACTUS asset portfolio layer. It is not wired into the
+  default Stage-1 baseline and is not a calibrated real pension fund asset
+  allocation.
+- `src/pk_alm/actus_asset_engine/aal_engine.py` is the strategic asset-side
+  engine. Its live AAL path raises clearly when the service-backed event path
+  is unavailable.
 - `src/pk_alm/scenarios/full_alm_scenario.py` is the integrated BVG + AAL
   scenario layer. It preserves the canonical `CashflowRecord` schema and does
   not replace or mutate the protected `run_stage1_baseline(...)` outputs.
-- `src/pk_alm/analytics/alm_kpis.py` produces an ALM KPI summary plus
+- `src/pk_alm/alm_analytics_engine/alm_kpis.py` produces an ALM KPI summary plus
   plot-ready DataFrames for cashflows by source and net cashflows.
 - `src/pk_alm/reporting/` exports Full ALM scenario outputs, saves matplotlib
   PNG plots, and prepares benchmark/plausibility tables from caller-provided
   reference values. It does not add Streamlit or new economic assumptions.
 - AAL is a main project dependency. The protected Stage-1 baseline still uses
-  `assets/deterministic.py` as a transparent zero-asset-return reference
-  baseline and therefore remains byte-stable across this AAL refactor.
+  `actus_asset_engine/deterministic.py` as a transparent zero-asset-return
+  reference baseline and therefore remains byte-stable across this AAL
+  refactor.
 - No stochastic interest-rate scenarios yet.
 - No mortality, new entrants, wage growth, inflation, survivor benefits, or
   disability benefits.

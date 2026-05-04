@@ -1,6 +1,6 @@
 import pytest
 
-from pk_alm.bvg.mortality import (
+from pk_alm.bvg_liability_engine.actuarial_assumptions.mortality import (
     EKF_0105,
     EKM_0105,
     MORTALITY_SOURCE_CAVEAT,

@@ -15,7 +15,7 @@ from typing import Any, Literal
 import numpy as np
 import pandas as pd
 
-from pk_alm.analytics.stochastic_aggregation import (
+from pk_alm.alm_analytics_engine.stochastic_aggregation import (
     LIQUIDITY_INFLECTION_COLUMNS,
     MC_METADATA_COLUMNS,
     RATE_PATHS_SUMMARY_COLUMNS,
@@ -29,8 +29,8 @@ from pk_alm.analytics.stochastic_aggregation import (
     validate_mc_metadata,
     validate_rate_paths_summary,
 )
-from pk_alm.bvg.engine_stage2d import Stage2DEngineResult, run_bvg_engine_stage2d
-from pk_alm.bvg.entry_dynamics import EntryAssumptions
+from pk_alm.bvg_liability_engine.orchestration.engine_stage2d import Stage2DEngineResult, run_bvg_engine_stage2d
+from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import EntryAssumptions
 from pk_alm.scenarios.stage2c_dynamic_parameters import (
     build_default_initial_portfolio_stage2c,
 )

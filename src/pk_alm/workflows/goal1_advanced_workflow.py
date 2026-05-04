@@ -20,28 +20,28 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from pk_alm.adapters.aal_asset_portfolio import (
+from pk_alm.actus_asset_engine.aal_asset_portfolio import (
     AssetSpec,
     CSHSpec,
     PAMSpec,
     STKSpec,
     validate_aal_asset_contract_specs,
 )
-from pk_alm.analytics.cashflows import (
+from pk_alm.alm_analytics_engine.cashflows import (
     find_liquidity_inflection_year,
     summarize_cashflows_by_year,
 )
-from pk_alm.analytics.funding import build_funding_ratio_trajectory
-from pk_alm.analytics.funding_summary import (
+from pk_alm.alm_analytics_engine.funding import build_funding_ratio_trajectory
+from pk_alm.alm_analytics_engine.funding_summary import (
     funding_summary_to_dataframe,
     summarize_funding_ratio,
 )
-from pk_alm.assets.actus_trajectory import compute_actus_asset_trajectory
-from pk_alm.assets.deterministic import build_deterministic_asset_trajectory
-from pk_alm.bvg.cohorts import ActiveCohort, RetiredCohort
-from pk_alm.bvg.engine_stage2c import Stage2CEngineResult, run_bvg_engine_stage2c
-from pk_alm.bvg.entry_dynamics import EntryAssumptions
-from pk_alm.bvg.mortality import (
+from pk_alm.actus_asset_engine.actus_trajectory import compute_actus_asset_trajectory
+from pk_alm.actus_asset_engine.deterministic import build_deterministic_asset_trajectory
+from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort, RetiredCohort
+from pk_alm.bvg_liability_engine.orchestration.engine_stage2c import Stage2CEngineResult, run_bvg_engine_stage2c
+from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import EntryAssumptions
+from pk_alm.bvg_liability_engine.actuarial_assumptions.mortality import (
     DEFAULT_EK0105_TABLE_ID,
     EKM_0105,
     EKF_0105,
@@ -52,9 +52,9 @@ from pk_alm.bvg.mortality import (
     load_ek0105_table,
     survival_factor,
 )
-from pk_alm.bvg.mortality_valuation import value_portfolio_state_stage2b
-from pk_alm.bvg.portfolio import BVGPortfolioState
-from pk_alm.bvg.valuation_dynamic import value_portfolio_states_dynamic
+from pk_alm.bvg_liability_engine.actuarial_assumptions.mortality_valuation import value_portfolio_state_stage2b
+from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
+from pk_alm.bvg_liability_engine.pension_logic.valuation_dynamic import value_portfolio_states_dynamic
 from pk_alm.cashflows.schema import CASHFLOW_COLUMNS, validate_cashflow_dataframe
 from pk_alm.scenarios.stage2d_stochastic import run_stage2d_stochastic
 from pk_alm.workflows.stage_app_workflow import (
@@ -722,7 +722,7 @@ def _build_mortality_aware_valuation(
     mortality_mode: str,
     mortality_table: MortalityTable | None,
 ) -> pd.DataFrame:
-    from pk_alm.bvg.dynamic_parameters import expand_parameter
+    from pk_alm.bvg_liability_engine.actuarial_assumptions.dynamic_parameters import expand_parameter
 
     rates = expand_parameter(
         technical_interest_rate,
@@ -769,7 +769,7 @@ def _build_actus_assets_and_cashflows(
     target_funding_ratio: float,
     horizon_years: int,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    from pk_alm.assets.aal_engine import run_aal_asset_engine
+    from pk_alm.actus_asset_engine.aal_engine import run_aal_asset_engine
     from pk_alm.scenarios.stage1_baseline import _asset_snapshots_from_actus_trajectory
 
     asset_result = run_aal_asset_engine(asset_specs)

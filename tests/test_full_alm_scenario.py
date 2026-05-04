@@ -7,8 +7,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from pk_alm.adapters.aal_asset_portfolio import PAMSpec
-from pk_alm.assets.aal_engine import AALAssetEngineResult
+from pk_alm.actus_asset_engine.aal_asset_portfolio import PAMSpec
+from pk_alm.actus_asset_engine.aal_engine import AALAssetEngineResult
 from pk_alm.cashflows.schema import CASHFLOW_COLUMNS, validate_cashflow_dataframe
 from pk_alm.scenarios import full_alm_scenario as scenario_mod
 from pk_alm.scenarios.full_alm_scenario import (

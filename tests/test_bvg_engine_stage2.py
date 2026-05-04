@@ -1,9 +1,9 @@
 import pandas as pd
 import pytest
 
-from pk_alm.bvg.engine import run_bvg_engine
-from pk_alm.bvg.engine_stage2 import Stage2EngineResult, run_bvg_engine_stage2
-from pk_alm.bvg.entry_dynamics import EntryAssumptions
+from pk_alm.bvg_liability_engine.orchestration.engine import run_bvg_engine
+from pk_alm.bvg_liability_engine.orchestration.engine_stage2 import Stage2EngineResult, run_bvg_engine_stage2
+from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import EntryAssumptions
 from pk_alm.cashflows.schema import CASHFLOW_COLUMNS
 from pk_alm.scenarios.stage1_baseline import build_default_stage1_portfolio
 

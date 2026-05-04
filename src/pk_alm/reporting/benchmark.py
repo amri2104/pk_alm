@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from pk_alm.analytics.alm_kpis import build_alm_kpi_summary
-from pk_alm.bvg.valuation import validate_valuation_dataframe
+from pk_alm.alm_analytics_engine.alm_kpis import build_alm_kpi_summary
+from pk_alm.bvg_liability_engine.pension_logic.valuation import validate_valuation_dataframe
 from pk_alm.reporting.full_alm_export import reject_protected_stage1_output_dir
 from pk_alm.scenarios.full_alm_scenario import FullALMScenarioResult
 

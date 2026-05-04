@@ -61,26 +61,29 @@ Stage 2 is **additive**. It must not modify Stage 1 modules. The protected
 files are:
 
 ```text
-src/pk_alm/bvg/formulas.py
-src/pk_alm/bvg/cohorts.py
-src/pk_alm/bvg/projection.py
-src/pk_alm/bvg/portfolio.py
-src/pk_alm/bvg/cashflow_generation.py
-src/pk_alm/bvg/retirement_transition.py
-src/pk_alm/bvg/engine.py
-src/pk_alm/bvg/valuation.py
+src/pk_alm/bvg_liability_engine/pension_logic/formulas.py
+src/pk_alm/bvg_liability_engine/domain_models/cohorts.py
+src/pk_alm/bvg_liability_engine/pension_logic/projection.py
+src/pk_alm/bvg_liability_engine/domain_models/portfolio.py
+src/pk_alm/bvg_liability_engine/pension_logic/cashflow_generation.py
+src/pk_alm/bvg_liability_engine/pension_logic/retirement_transition.py
+src/pk_alm/bvg_liability_engine/orchestration/engine.py
+src/pk_alm/bvg_liability_engine/pension_logic/valuation.py
 src/pk_alm/scenarios/stage1_baseline.py
 src/pk_alm/scenarios/full_alm_scenario.py
 outputs/stage1_baseline/*
 ```
 
+The legacy `src/pk_alm/bvg/` shim package is no longer part of the active
+source tree.
+
 Stage 2 lives in **new files**:
 
 ```text
-src/pk_alm/bvg/salary_dynamics.py
-src/pk_alm/bvg/turnover.py
-src/pk_alm/bvg/entry_dynamics.py
-src/pk_alm/bvg/engine_stage2.py
+src/pk_alm/bvg_liability_engine/population_dynamics/salary_dynamics.py
+src/pk_alm/bvg_liability_engine/population_dynamics/turnover.py
+src/pk_alm/bvg_liability_engine/population_dynamics/entry_dynamics.py
+src/pk_alm/bvg_liability_engine/orchestration/engine_stage2.py
 src/pk_alm/scenarios/stage2_baseline.py
 ```
 
@@ -279,7 +282,7 @@ event would only add noise).
 ### 10.1 Public API
 
 ```text
-src/pk_alm/bvg/engine_stage2.py:
+src/pk_alm/bvg_liability_engine/orchestration/engine_stage2.py:
 
 @dataclass(frozen=True)
 class Stage2EngineResult:

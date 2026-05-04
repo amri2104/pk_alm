@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from pk_alm.bvg.mortality import (
+from pk_alm.bvg_liability_engine.actuarial_assumptions.mortality import (
     MORTALITY_MODE_EK0105,
     MORTALITY_MODE_OFF,
 )

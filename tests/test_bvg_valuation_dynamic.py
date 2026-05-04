@@ -3,10 +3,10 @@ import math
 import pandas as pd
 import pytest
 
-from pk_alm.bvg.cohorts import RetiredCohort
-from pk_alm.bvg.portfolio import BVGPortfolioState
-from pk_alm.bvg.valuation import VALUATION_COLUMNS, value_portfolio_states
-from pk_alm.bvg.valuation_dynamic import value_portfolio_states_dynamic
+from pk_alm.bvg_liability_engine.domain_models.cohorts import RetiredCohort
+from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
+from pk_alm.bvg_liability_engine.pension_logic.valuation import VALUATION_COLUMNS, value_portfolio_states
+from pk_alm.bvg_liability_engine.pension_logic.valuation_dynamic import value_portfolio_states_dynamic
 
 
 RATE = 0.0176

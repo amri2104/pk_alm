@@ -5,7 +5,7 @@ import math
 import pandas as pd
 import pytest
 
-from pk_alm.adapters.aal_asset_portfolio import (
+from pk_alm.actus_asset_engine.aal_asset_portfolio import (
     AALAssetContractSpec,
     CSHSpec,
     DEFAULT_AAL_ASSET_CONTRACT_SPECS,
@@ -18,7 +18,7 @@ from pk_alm.adapters.aal_asset_portfolio import (
     get_default_aal_asset_contract_specs,
     validate_aal_asset_contract_specs,
 )
-from pk_alm.adapters.aal_probe import get_aal_module
+from pk_alm.actus_asset_engine.aal_probe import get_aal_module
 from pk_alm.scenarios.stage1_baseline import run_stage1_baseline
 
 

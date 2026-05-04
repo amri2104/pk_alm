@@ -3,15 +3,15 @@ import math
 import pandas as pd
 import pytest
 
-from pk_alm.bvg.cohorts import ActiveCohort
-from pk_alm.bvg.entry_dynamics import (
+from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort
+from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import (
     EntryAssumptions,
     apply_entries_to_portfolio,
     build_entry_cashflow_record,
     generate_entry_cohort_for_year,
     get_default_entry_assumptions,
 )
-from pk_alm.bvg.portfolio import BVGPortfolioState
+from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
 
 
 def test_entry_assumptions_defaults_validate() -> None:

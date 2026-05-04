@@ -8,7 +8,7 @@
 
 **Rationale:** ACTUS is strong for standardized financial contract cashflows, especially asset-side instruments. Pension fund liabilities are governed by Swiss pension logic, cohort assumptions, contribution rules, conversion rates, and obligation valuation. These do not map cleanly to a single ACTUS contract type.
 
-**Consequence:** The system keeps ACTUS/AAL where it is strongest, on the asset side, and uses purpose-built Python logic where pension fund semantics require it. AAL is a required dependency for asset-side ACTUS work. The protected deterministic Stage-1 baseline still uses the zero-asset-return reference asset roll-forward and is not replaced by the integrated Full ALM scenario.
+**Consequence:** The system keeps ACTUS/AAL where it is strongest, on the asset side, and uses purpose-built Python logic where pension fund semantics require it. AAL is a required dependency for asset-side ACTUS work. The protected deterministic Stage-1 baseline still uses the zero-asset-return reference asset roll-forward and is not replaced by the integrated Full ALM scenario. The canonical packages expose the architecture directly: `src/pk_alm/bvg_liability_engine/`, `src/pk_alm/actus_asset_engine/`, and `src/pk_alm/alm_analytics_engine/`.
 
 ## ADR 002: Why Stage 1 Is Deterministic Before Stochastic Scenarios
 

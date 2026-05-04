@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from pk_alm.bvg.dynamic_parameters import expand_parameter, resolve_parameter
+from pk_alm.bvg_liability_engine.actuarial_assumptions.dynamic_parameters import expand_parameter, resolve_parameter
 
 
 def test_scalar_resolves_to_identity_for_any_step() -> None:

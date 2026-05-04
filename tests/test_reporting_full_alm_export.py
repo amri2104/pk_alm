@@ -6,13 +6,13 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from pk_alm.analytics.alm_kpis import (
+from pk_alm.alm_analytics_engine.alm_kpis import (
     ALM_KPI_SUMMARY_COLUMNS,
     CASHFLOW_BY_SOURCE_PLOT_COLUMNS,
     NET_CASHFLOW_PLOT_COLUMNS,
 )
-from pk_alm.analytics.cashflows import ANNUAL_CASHFLOW_COLUMNS
-from pk_alm.analytics.funding import FUNDING_RATIO_COLUMNS
+from pk_alm.alm_analytics_engine.cashflows import ANNUAL_CASHFLOW_COLUMNS
+from pk_alm.alm_analytics_engine.funding import FUNDING_RATIO_COLUMNS
 from pk_alm.cashflows.schema import CASHFLOW_COLUMNS
 from pk_alm.reporting import full_alm_export
 from pk_alm.reporting.full_alm_export import (

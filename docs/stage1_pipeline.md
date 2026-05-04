@@ -90,7 +90,7 @@ Sign convention from the pension fund's perspective:
 
 ### Minimal ACTUS Adapter Boundary
 
-Sprint 4A adds `src/pk_alm/adapters/actus_adapter.py`, a small boundary that
+Sprint 4A adds `src/pk_alm/actus_asset_engine/actus_adapter.py`, a small boundary that
 maps simplified ACTUS/AAL-style event dictionaries to canonical
 `CashflowRecord` objects and schema-valid DataFrames with `source="ACTUS"`.
 This preserves the shared cashflow schema as the integration contract.
@@ -106,7 +106,7 @@ The former Sprint 4C asset overlay helper has been moved to `archive/`.
 The active package path for integrated asset/liability cashflows is the Full
 ALM scenario layer, not the protected Stage-1 baseline.
 
-Sprint 5A now leaves `src/pk_alm/adapters/aal_probe.py` as a small
+Sprint 5A now leaves `src/pk_alm/actus_asset_engine/aal_probe.py` as a small
 `get_aal_module()` import helper for the required AAL dependency.
 
 The former Sprint 5B API-surface introspection helper has been archived.
@@ -173,7 +173,7 @@ modules and do not affect the seven protected Stage-1 CSV outputs.
 
 ### AAL Asset Boundary
 
-Sprint 7A adds `src/pk_alm/adapters/aal_asset_boundary.py`, a small
+Sprint 7A adds `src/pk_alm/actus_asset_engine/aal_asset_boundary.py`, a small
 asset-model construction boundary. It uses the existing `get_aal_module()`
 gateway from `aal_probe.py` and provides `build_aal_pam_contract(module)` and
 `build_aal_portfolio(module, contracts)` for real `PAM` and `Portfolio`
@@ -194,7 +194,7 @@ Asset Engine and Full ALM Scenario.
 
 ### AAL/ACTUS Asset Portfolio v1
 
-Sprint 7C adds `src/pk_alm/adapters/aal_asset_portfolio.py`, a
+Sprint 7C adds `src/pk_alm/actus_asset_engine/aal_asset_portfolio.py`, a
 multi-contract asset portfolio layer. It represents each asset with a frozen
 contract spec and supports a small default portfolio of CHF
 fixed-rate PAM-like contracts with distinct contract IDs, maturities,
@@ -208,7 +208,7 @@ Engine.
 
 ### AAL Asset Engine v1
 
-Sprint 7D adds `src/pk_alm/assets/aal_engine.py`, the strategic asset-side
+Sprint 7D adds `src/pk_alm/actus_asset_engine/aal_engine.py`, the strategic asset-side
 engine. This engine is separate from the protected Stage-1 baseline.
 
 The main asset path is:
@@ -244,7 +244,7 @@ outputs, and does not mutate existing files under `outputs/stage1_baseline/`.
 
 ### ALM KPI / Plot-ready Outputs
 
-Sprint 7F adds `src/pk_alm/analytics/alm_kpis.py`, a reporting layer for Full
+Sprint 7F adds `src/pk_alm/alm_analytics_engine/alm_kpis.py`, a reporting layer for Full
 ALM results. It produces:
 
 - an `ALMKPISummary` with stable headline KPIs,

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from pk_alm.analytics.distributional import (
+from pk_alm.alm_analytics_engine.distributional import (
     compute_percentiles,
     compute_underfunding_probability,
     compute_var_es,

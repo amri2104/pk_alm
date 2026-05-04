@@ -3,7 +3,7 @@ import math
 import pandas as pd
 import pytest
 
-from pk_alm.analytics.cashflows import ANNUAL_CASHFLOW_COLUMNS
+from pk_alm.alm_analytics_engine.cashflows import ANNUAL_CASHFLOW_COLUMNS
 from pk_alm.scenarios.result_summary import (
     SCENARIO_RESULT_COLUMNS,
     ScenarioResultSummary,

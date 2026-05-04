@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from pk_alm.adapters.aal_asset_portfolio import CSHSpec, PAMSpec, STKSpec
-from pk_alm.assets.aal_engine import AALAssetEngineResult
-from pk_alm.assets.actus_trajectory import ACTUS_ASSET_TRAJECTORY_COLUMNS
+from pk_alm.actus_asset_engine.aal_asset_portfolio import CSHSpec, PAMSpec, STKSpec
+from pk_alm.actus_asset_engine.aal_engine import AALAssetEngineResult
+from pk_alm.actus_asset_engine.actus_trajectory import ACTUS_ASSET_TRAJECTORY_COLUMNS
 from pk_alm.cashflows.schema import CASHFLOW_COLUMNS
-from pk_alm.bvg.mortality import MORTALITY_MODE_EK0105, MORTALITY_MODE_OFF
+from pk_alm.bvg_liability_engine.actuarial_assumptions.mortality import MORTALITY_MODE_EK0105, MORTALITY_MODE_OFF
 from pk_alm.scenarios import stage1_baseline as stage1_mod
 from pk_alm.scenarios.stage1_baseline import run_stage1_baseline
 from pk_alm.scenarios.stage2_baseline import (

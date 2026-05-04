@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from pk_alm.adapters.aal_asset_portfolio import (
+from pk_alm.actus_asset_engine.aal_asset_portfolio import (
     AALAssetContractSpec,
     CSHSpec,
     DEFAULT_AAL_ASSET_CONTRACT_SPECS,
@@ -14,9 +14,9 @@ from pk_alm.adapters.aal_asset_portfolio import (
     STKSpec,
     get_default_aal_asset_contract_specs,
 )
-from pk_alm.adapters.actus_adapter import aal_events_to_cashflow_dataframe
-from pk_alm.assets import aal_engine
-from pk_alm.assets.aal_engine import AALAssetEngineResult, run_aal_asset_engine
+from pk_alm.actus_asset_engine.actus_adapter import aal_events_to_cashflow_dataframe
+from pk_alm.actus_asset_engine import aal_engine
+from pk_alm.actus_asset_engine.aal_engine import AALAssetEngineResult, run_aal_asset_engine
 from pk_alm.cashflows.schema import CASHFLOW_COLUMNS, validate_cashflow_dataframe
 from pk_alm.scenarios.stage1_baseline import run_stage1_baseline
 

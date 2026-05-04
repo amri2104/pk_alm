@@ -4,10 +4,10 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from pk_alm.assets.deterministic import build_deterministic_asset_trajectory
-from pk_alm.bvg.engine_stage2 import run_bvg_engine_stage2
-from pk_alm.bvg.entry_dynamics import EntryAssumptions
-from pk_alm.bvg.valuation import value_portfolio_states
+from pk_alm.actus_asset_engine.deterministic import build_deterministic_asset_trajectory
+from pk_alm.bvg_liability_engine.orchestration.engine_stage2 import run_bvg_engine_stage2
+from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import EntryAssumptions
+from pk_alm.bvg_liability_engine.pension_logic.valuation import value_portfolio_states
 from pk_alm.scenarios.stage2c_dynamic_parameters import (
     PARAMETER_TRAJECTORY_COLUMNS,
     STAGE2C_OUTPUT_FILENAMES,
@@ -15,7 +15,7 @@ from pk_alm.scenarios.stage2c_dynamic_parameters import (
     build_default_initial_portfolio_stage2c,
     run_stage2c_dynamic_parameters,
 )
-from pk_alm.analytics.cashflows import summarize_cashflows_by_year
+from pk_alm.alm_analytics_engine.cashflows import summarize_cashflows_by_year
 
 
 def _file_hashes(path: Path) -> dict[str, str]:

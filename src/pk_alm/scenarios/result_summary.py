@@ -8,11 +8,11 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from pk_alm.analytics.cashflows import validate_annual_cashflow_dataframe
-from pk_alm.analytics.funding import validate_funding_ratio_dataframe
-from pk_alm.analytics.funding_summary import validate_funding_summary_dataframe
-from pk_alm.assets.deterministic import validate_asset_dataframe
-from pk_alm.bvg.valuation import validate_valuation_dataframe
+from pk_alm.alm_analytics_engine.cashflows import validate_annual_cashflow_dataframe
+from pk_alm.alm_analytics_engine.funding import validate_funding_ratio_dataframe
+from pk_alm.alm_analytics_engine.funding_summary import validate_funding_summary_dataframe
+from pk_alm.actus_asset_engine.deterministic import validate_asset_dataframe
+from pk_alm.bvg_liability_engine.pension_logic.valuation import validate_valuation_dataframe
 
 SCENARIO_RESULT_COLUMNS = (
     "scenario_id",

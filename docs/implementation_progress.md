@@ -23,16 +23,17 @@ default Stage-1 baseline; the seven default Stage-1 CSV outputs are
 unchanged.
 
 Sprint 7A adds AAL asset construction helpers
-(`src/pk_alm/adapters/aal_asset_boundary.py`) for real AAL `PAM` and
+(`src/pk_alm/actus_asset_engine/aal_asset_boundary.py`) for real AAL `PAM` and
 `Portfolio` objects. Sprint 7B's former pension fund AAL asset demo has been
 archived. Sprint 7C adds a multi-contract AAL/ACTUS asset portfolio layer
-(`src/pk_alm/adapters/aal_asset_portfolio.py`) that maps per-contract specs
-into dynamic AAL PAM terms.
+(`src/pk_alm/actus_asset_engine/aal_asset_portfolio.py`) that maps
+per-contract specs into dynamic AAL PAM terms.
 
-Sprint 7D adds the AAL Asset Engine v1 (`src/pk_alm/assets/aal_engine.py`).
-AAL is now a required project dependency for asset-side ACTUS work. The engine
-uses `PublicActusService.generateEvents(...)` directly and has no fixture
-cashflow path.
+Sprint 7D adds the AAL Asset Engine v1
+(`src/pk_alm/actus_asset_engine/aal_engine.py`). AAL is now a required project
+dependency for asset-side ACTUS work. The engine uses
+`PublicActusService.generateEvents(...)` directly and has no fixture cashflow
+path.
 
 Sprint 7E adds the Full ALM Scenario
 (`src/pk_alm/scenarios/full_alm_scenario.py`). It combines BVG liability
@@ -42,10 +43,17 @@ analytics on the combined stream, and does not mutate the seven protected
 Stage-1 CSV outputs.
 
 Sprint 7F adds the ALM KPI / plot-ready output layer
-(`src/pk_alm/analytics/alm_kpis.py`). It produces a compact KPI summary, a
-cashflow-by-source plot table, and a net-cashflow plot table from existing
-Full ALM outputs. It does not add actual matplotlib, Streamlit, or dashboard
-plot rendering.
+(`src/pk_alm/alm_analytics_engine/alm_kpis.py`). It produces a compact KPI
+summary, a cashflow-by-source plot table, and a net-cashflow plot table from
+existing Full ALM outputs. It does not add actual matplotlib, Streamlit, or
+dashboard plot rendering.
+
+Sprint 9 adds the three-engine package refactor. The active package structure
+now mirrors the thesis architecture directly:
+`src/pk_alm/bvg_liability_engine/`,
+`src/pk_alm/actus_asset_engine/`, and
+`src/pk_alm/alm_analytics_engine/`. Legacy shim packages were removed from
+the active tree to keep the source structure compact.
 
 Sprint 7G is the repository cleanup analysis / hygiene sprint. It confirmed
 that the current code still follows the three-engine architecture: BVG
@@ -71,7 +79,7 @@ and prepares benchmark/plausibility tables from caller-provided reference
 values. It does not add Streamlit, stochastic modelling, or new financial
 assumptions.
 
-The full system test suite currently passes with **840 passed, 1 skipped**.
+The full system test suite currently passes with **1007 passed, 12 skipped**.
 Historical documentation-status anchors include earlier observations of
 **874 passed, 8 skipped**, **809 passed, 8 skipped**,
 **753 passed, 8 skipped**, and **761 passed** in an AAL-focused temporary
@@ -122,15 +130,15 @@ environment. These are not current expected results.
 The current architecture is organised around three engines and one shared
 integration contract:
 
-1. **BVG Liability Engine** — `src/pk_alm/bvg/` models the liability side:
-   formulas, cohorts, portfolio states, yearly projection, retirement
-   transitions, BVG cashflow generation, and deterministic Stage-1 valuation.
-2. **AAL Asset Engine** — `src/pk_alm/assets/aal_engine.py` models the asset
+1. **BVG Liability Engine** — `src/pk_alm/bvg_liability_engine/` models the
+   liability side, grouped into domain models, pension logic, population
+   dynamics, actuarial assumptions, and orchestration.
+2. **AAL Asset Engine** — `src/pk_alm/actus_asset_engine/` models the asset
    side. AAL is the required strategic asset engine for ACTUS cashflow
-   generation.
-3. **ALM Analytics Engine** — `src/pk_alm/analytics/` validates and aggregates
-   cashflows, computes structural liquidity and funding-ratio outputs, and
-   builds ALM KPI / plot-ready tables.
+   generation, and the AAL adapter boundary is reachable from this package.
+3. **ALM Analytics Engine** — `src/pk_alm/alm_analytics_engine/` validates and
+   aggregates cashflows, computes structural liquidity and funding-ratio
+   outputs, and builds ALM KPI / plot-ready tables.
 4. **Shared CashflowRecord bridge** — `src/pk_alm/cashflows/schema.py` defines
    the canonical seven-column cashflow schema (`contractId`, `time`, `type`,
    `payoff`, `nominalValue`, `currency`, `source`). Both BVG and ACTUS/AAL
@@ -153,12 +161,16 @@ Scenario layers sit on top of these engines:
 Support and demo layers remain in the repository because they document the
 incremental build path:
 
-- `src/pk_alm/adapters/actus_adapter.py` is the schema adapter for AAL event
-  output.
-- `src/pk_alm/adapters/aal_probe.py` is the required AAL import helper.
-- `src/pk_alm/adapters/aal_asset_boundary.py` and
+- `src/pk_alm/actus_asset_engine/actus_adapter.py` is the schema adapter for
+  AAL event output.
+- `src/pk_alm/actus_asset_engine/aal_probe.py` is the required AAL import
+  helper.
+- `src/pk_alm/actus_asset_engine/aal_asset_boundary.py` and
   `aal_asset_portfolio.py` provide AAL construction helpers and portfolio
   specs used by the asset engine and demos.
+- Legacy `src/pk_alm/bvg/`, `src/pk_alm/assets/`, `src/pk_alm/analytics/`,
+  and `src/pk_alm/adapters/` shim packages were removed after tests moved to
+  the canonical engine imports.
 - The former `asset_overlay.py`, `aal_asset_demo.py`, time-grid, and monthly
   PR/RP feasibility layers have been moved to `archive/`. They are no longer
   active `pk_alm` package modules and are not the canonical Full ALM path.
@@ -206,7 +218,7 @@ Generated CSV files (relative to the working directory):
 python3 -m pytest
 ```
 
-Current expected result: **840 passed, 1 skipped**.
+Current expected result: **1007 passed, 12 skipped**.
 
 The tests are part of the verification strategy for the bachelor thesis. They
 serve as executable documentation: every financial formula has at least one

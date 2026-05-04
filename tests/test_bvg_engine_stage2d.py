@@ -2,9 +2,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pk_alm.bvg.engine_stage2c import run_bvg_engine_stage2c
-from pk_alm.bvg.engine_stage2d import Stage2DEngineResult, run_bvg_engine_stage2d
-from pk_alm.bvg.entry_dynamics import EntryAssumptions
+from pk_alm.bvg_liability_engine.orchestration.engine_stage2c import run_bvg_engine_stage2c
+from pk_alm.bvg_liability_engine.orchestration.engine_stage2d import Stage2DEngineResult, run_bvg_engine_stage2d
+from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import EntryAssumptions
 from pk_alm.scenarios.stage2c_dynamic_parameters import (
     build_default_initial_portfolio_stage2c,
 )

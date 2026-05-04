@@ -1,6 +1,6 @@
 import pytest
-from pk_alm.bvg.cohorts import ActiveCohort, RetiredCohort
-from pk_alm.bvg.portfolio import BVGPortfolioState
+from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort, RetiredCohort
+from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
 
 # ---------------------------------------------------------------------------
 # Fixtures

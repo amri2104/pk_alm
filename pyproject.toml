@@ -28,7 +28,7 @@ dev = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-"pk_alm.bvg.data" = ["*.csv"]
+"pk_alm.bvg_liability_engine.actuarial_assumptions.data" = ["*.csv"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

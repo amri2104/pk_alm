@@ -6,7 +6,7 @@ from functools import lru_cache
 import pandas as pd
 import pytest
 
-from pk_alm.analytics.alm_kpis import (
+from pk_alm.alm_analytics_engine.alm_kpis import (
     ALM_KPI_SUMMARY_COLUMNS,
     CASHFLOW_BY_SOURCE_PLOT_COLUMNS,
     NET_CASHFLOW_PLOT_COLUMNS,

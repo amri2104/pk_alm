@@ -12,11 +12,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.figure import Figure  # noqa: E402
 
-from pk_alm.analytics.alm_kpis import (
+from pk_alm.alm_analytics_engine.alm_kpis import (
     CASHFLOW_BY_SOURCE_PLOT_COLUMNS,
     NET_CASHFLOW_PLOT_COLUMNS,
 )
-from pk_alm.analytics.funding import validate_funding_ratio_dataframe
+from pk_alm.alm_analytics_engine.funding import validate_funding_ratio_dataframe
 from pk_alm.reporting.full_alm_export import reject_protected_stage1_output_dir
 
 FULL_ALM_PLOT_FILENAMES: dict[str, str] = {

@@ -3,8 +3,8 @@ import math
 import pandas as pd
 import pytest
 
-from pk_alm.analytics.funding import FUNDING_RATIO_COLUMNS
-from pk_alm.analytics.funding_summary import (
+from pk_alm.alm_analytics_engine.funding import FUNDING_RATIO_COLUMNS
+from pk_alm.alm_analytics_engine.funding_summary import (
     FUNDING_SUMMARY_COLUMNS,
     FundingRatioSummary,
     funding_summary_to_dataframe,

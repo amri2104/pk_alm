@@ -2,7 +2,7 @@
 
 import awesome_actus_lib
 
-from pk_alm.adapters.aal_probe import get_aal_module
+from pk_alm.actus_asset_engine.aal_probe import get_aal_module
 
 
 def test_get_aal_module_returns_required_aal_package():

@@ -3,8 +3,8 @@ import math
 import pandas as pd
 import pytest
 
-from pk_alm.analytics.cashflows import ANNUAL_CASHFLOW_COLUMNS
-from pk_alm.assets.deterministic import (
+from pk_alm.alm_analytics_engine.cashflows import ANNUAL_CASHFLOW_COLUMNS
+from pk_alm.actus_asset_engine.deterministic import (
     ASSET_SNAPSHOT_COLUMNS,
     DeterministicAssetSnapshot,
     asset_snapshots_to_dataframe,
@@ -13,7 +13,7 @@ from pk_alm.assets.deterministic import (
     project_assets_one_year,
     validate_asset_dataframe,
 )
-from pk_alm.bvg.valuation import VALUATION_COLUMNS
+from pk_alm.bvg_liability_engine.pension_logic.valuation import VALUATION_COLUMNS
 
 
 def _valuation_df(liabilities, projection_years=None):
