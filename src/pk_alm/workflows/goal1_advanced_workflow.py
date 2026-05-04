@@ -239,6 +239,7 @@ class Goal1AdvancedInput:
     stochastic_enabled: bool = False
     model_active: str = "hull_white"
     model_technical: str = "hull_white"
+    stochastic_asset_return: float = 0.025
     n_paths: int = 100
     seed: int = 42
     output_dir: Path = GOAL1_ADVANCED_OUTPUT_DIR
@@ -885,6 +886,7 @@ def _run_stochastic_sidecar(input_data: Goal1AdvancedInput) -> pd.DataFrame:
         contribution_multiplier=input_data.contribution_multiplier,
         valuation_terminal_age=input_data.valuation_terminal_age,
         target_funding_ratio=input_data.target_funding_ratio,
+        annual_asset_return=input_data.stochastic_asset_return,
         salary_growth_rate=input_data.salary_growth_rate,
         turnover_rate=input_data.turnover_rate,
         entry_assumptions=EntryAssumptions(

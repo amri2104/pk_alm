@@ -432,6 +432,14 @@ def render_run_panel(
         )
         n_paths = st.number_input("n_paths", 1, 5000, 100, 10)
         seed = st.number_input("seed", 0, 1_000_000, 42, 1)
+        stochastic_asset_return = st.number_input(
+            "stochastic_asset_return",
+            -0.10,
+            0.15,
+            0.025,
+            0.005,
+            format="%.3f"
+        )
 
     history = st.session_state.get("run_history", [])
     if history:
@@ -455,6 +463,7 @@ def render_run_panel(
         "model_technical": model_technical,
         "n_paths": n_paths,
         "seed": seed,
+        "stochastic_asset_return": stochastic_asset_return,
     }
 
 

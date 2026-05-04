@@ -151,7 +151,7 @@ def test_metadata_contains_model_params() -> None:
     assert row["seed"] == 13
     active_params = json.loads(row["model_active_params"])
     technical_params = json.loads(row["model_technical_params"])
-    assert active_params["sigma"] == 0.005
+    assert active_params["sigma"] == 0.001
     assert technical_params["sigma"] == 0.005
     assert "calibrator" in active_params
 

@@ -112,7 +112,7 @@ def run_stage2d_stochastic(
     contribution_multiplier: float = 1.4,
     valuation_terminal_age: int = 90,
     target_funding_ratio: float = 1.076,
-    annual_asset_return: float = 0.0,
+    annual_asset_return: float = 0.025,
     salary_growth_rate: float = 0.015,
     turnover_rate: float = 0.02,
     entry_assumptions: EntryAssumptions | None = None,
@@ -138,7 +138,7 @@ def run_stage2d_stochastic(
     create_model, curve_calibrator = _load_stochastic_rates()
     active_params, active_metadata_params = _resolve_model_params(
         active_model_key,
-        model_active_params,
+        model_active_params if model_active_params is not None else {"sigma": 0.001},
         curve_calibrator,
     )
     technical_params, technical_metadata_params = _resolve_model_params(
@@ -272,7 +272,7 @@ def _simulate_rate_paths(
     seed: int,
 ) -> tuple[np.ndarray, np.ndarray]:
     active_model = create_model(model_active, **active_params, seed=seed)
-    technical_model = create_model(model_technical, **technical_params, seed=seed + 1)
+    technical_model = create_model(model_technical, **technical_params, seed=seed)
 
     if horizon_years == 0:
         active_paths = np.empty((n_paths, 0), dtype=float)
