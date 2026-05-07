@@ -38,9 +38,20 @@ from pk_alm.alm_analytics_engine.funding_summary import (
 )
 from pk_alm.actus_asset_engine.actus_trajectory import compute_actus_asset_trajectory
 from pk_alm.actus_asset_engine.deterministic import build_deterministic_asset_trajectory
+from pk_alm.bvg_liability_engine.assumptions import (
+    BVGAssumptions,
+    FlatRateCurve,
+    MortalityAssumptions,
+    RateCurve,
+)
+from pk_alm.bvg_liability_engine.assumptions.rate_curves import (
+    expand as expand_curve,
+    from_dynamic_parameter,
+)
 from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort, RetiredCohort
-from pk_alm.bvg_liability_engine.orchestration.engine_stage2c import Stage2CEngineResult, run_bvg_engine_stage2c
+from pk_alm.bvg_liability_engine.orchestration import BVGEngineResult, run_bvg_engine
 from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import EntryAssumptions
+from pk_alm.bvg_liability_engine.population_dynamics.entry_policies import FixedEntryPolicy
 from pk_alm.bvg_liability_engine.actuarial_assumptions.mortality import (
     DEFAULT_EK0105_TABLE_ID,
     EKM_0105,
@@ -253,7 +264,7 @@ class Goal1AdvancedResult:
     input: Goal1AdvancedInput
     initial_state: BVGPortfolioState
     asset_specs: tuple[AssetSpec, ...]
-    engine_result: Stage2CEngineResult
+    engine_result: BVGEngineResult
     cashflows: pd.DataFrame
     valuation_snapshots: pd.DataFrame
     annual_cashflows: pd.DataFrame
@@ -291,19 +302,47 @@ def run_goal1_advanced_alm(input_data: Goal1AdvancedInput) -> Goal1AdvancedResul
         shocked.retiree_table,
     )
 
-    stage2c_engine = run_bvg_engine_stage2c(
-        initial_state=initial_state,
-        horizon_years=shocked.horizon_years,
-        active_interest_rate=shocked.active_interest_rate,
-        retired_interest_rate=shocked.retired_interest_rate,
-        salary_growth_rate=shocked.salary_growth_rate,
-        turnover_rate=shocked.turnover_rate,
-        entry_assumptions=EntryAssumptions(
-            entry_count_per_year=shocked.entry_count_per_year
-        ),
-        contribution_multiplier=shocked.contribution_multiplier,
+    curve_horizon = max(shocked.horizon_years + 1, 1)
+    assumptions = BVGAssumptions(
         start_year=shocked.start_year,
-        conversion_rate=shocked.conversion_rate,
+        horizon_years=shocked.horizon_years,
+        retirement_age=65,
+        valuation_terminal_age=shocked.valuation_terminal_age,
+        active_crediting_rate=_curve_from_rate_input(
+            shocked.active_interest_rate,
+            start_year=shocked.start_year,
+            horizon_years=curve_horizon,
+        ),
+        retired_interest_rate=FlatRateCurve(shocked.retired_interest_rate),
+        technical_discount_rate=_curve_from_rate_input(
+            shocked.technical_interest_rate,
+            start_year=shocked.start_year,
+            horizon_years=curve_horizon,
+        ),
+        economic_discount_rate=_curve_from_rate_input(
+            shocked.technical_interest_rate,
+            start_year=shocked.start_year,
+            horizon_years=curve_horizon,
+        ),
+        salary_growth_rate=FlatRateCurve(shocked.salary_growth_rate),
+        conversion_rate=_curve_from_rate_input(
+            shocked.conversion_rate,
+            start_year=shocked.start_year,
+            horizon_years=curve_horizon,
+        ),
+        turnover_rate=shocked.turnover_rate,
+        capital_withdrawal_fraction=0.35,
+        contribution_multiplier=shocked.contribution_multiplier,
+        mortality=MortalityAssumptions(mode="off"),
+        entry_policy=FixedEntryPolicy(
+            EntryAssumptions(
+                entry_count_per_year=shocked.entry_count_per_year
+            )
+        ),
+    )
+    stage2c_engine = run_bvg_engine(
+        initial_state=initial_state,
+        assumptions=assumptions,
     )
 
     base_valuation = value_portfolio_states_dynamic(
@@ -690,7 +729,7 @@ def _renormalize_weights(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _apply_mortality_to_cashflows(
-    engine_result: Stage2CEngineResult,
+    engine_result: BVGEngineResult,
     mortality_table: MortalityTable | None,
     start_year: int,
 ) -> pd.DataFrame:
@@ -718,17 +757,15 @@ def _apply_mortality_to_cashflows(
 
 def _build_mortality_aware_valuation(
     states: tuple[BVGPortfolioState, ...],
-    technical_interest_rate: float | tuple[float, ...],
+    technical_interest_rate: float | tuple[float, ...] | RateCurve,
     valuation_terminal_age: int,
     mortality_mode: str,
     mortality_table: MortalityTable | None,
 ) -> pd.DataFrame:
-    from pk_alm.bvg_liability_engine.actuarial_assumptions.dynamic_parameters import expand_parameter
-
-    rates = expand_parameter(
+    rates = _expand_rate_input(
         technical_interest_rate,
-        len(states),
-        "technical_interest_rate",
+        start_year=0,
+        horizon_years=len(states),
     )
     rows = [
         value_portfolio_state_stage2b(
@@ -741,6 +778,39 @@ def _build_mortality_aware_valuation(
         for i, state in enumerate(states)
     ]
     return pd.DataFrame(rows)
+
+
+def _curve_from_rate_input(
+    value: float | tuple[float, ...] | RateCurve,
+    *,
+    start_year: int,
+    horizon_years: int,
+) -> RateCurve:
+    if isinstance(value, RateCurve):
+        return value
+    return from_dynamic_parameter(
+        value,
+        start_year=start_year,
+        horizon_years=horizon_years,
+    )
+
+
+def _expand_rate_input(
+    value: float | tuple[float, ...] | RateCurve,
+    *,
+    start_year: int,
+    horizon_years: int,
+) -> tuple[float, ...]:
+    curve = _curve_from_rate_input(
+        value,
+        start_year=start_year,
+        horizon_years=horizon_years,
+    )
+    return expand_curve(
+        curve,
+        start_year=start_year,
+        horizon_years=horizon_years,
+    )
 
 
 def _valuation_for_funding_schema(valuation: pd.DataFrame) -> pd.DataFrame:

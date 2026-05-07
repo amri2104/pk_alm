@@ -1,10 +1,19 @@
 import pandas as pd
 import pytest
 
+from pk_alm.bvg_liability_engine.assumptions import (
+    BVGAssumptions,
+    FlatRateCurve,
+    MortalityAssumptions,
+)
+from pk_alm.bvg_liability_engine.assumptions.rate_curves import (
+    expand as expand_curve,
+    from_dynamic_parameter,
+)
 from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort
-from pk_alm.bvg_liability_engine.orchestration.engine_stage2 import run_bvg_engine_stage2
-from pk_alm.bvg_liability_engine.orchestration.engine_stage2c import Stage2CEngineResult, run_bvg_engine_stage2c
+from pk_alm.bvg_liability_engine.orchestration import BVGEngineResult, run_bvg_engine
 from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import EntryAssumptions
+from pk_alm.bvg_liability_engine.population_dynamics.entry_policies import FixedEntryPolicy
 from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
 from pk_alm.cashflows.schema import CASHFLOW_COLUMNS
 
@@ -32,9 +41,57 @@ def _default_portfolio() -> BVGPortfolioState:
     )
 
 
+def run_bvg_engine_stage2c(
+    initial,
+    *,
+    horizon_years,
+    active_interest_rate,
+    retired_interest_rate,
+    salary_growth_rate=0.015,
+    turnover_rate=0.02,
+    entry_assumptions=None,
+    contribution_multiplier=1.4,
+    start_year=2026,
+    retirement_age=65,
+    capital_withdrawal_fraction=0.35,
+    conversion_rate=0.068,
+) -> BVGEngineResult:
+    entry = (
+        entry_assumptions
+        if entry_assumptions is not None
+        else EntryAssumptions()
+    )
+    assumptions = BVGAssumptions(
+        start_year=start_year,
+        horizon_years=horizon_years,
+        retirement_age=retirement_age,
+        valuation_terminal_age=90,
+        active_crediting_rate=from_dynamic_parameter(
+            active_interest_rate,
+            start_year=start_year,
+            horizon_years=horizon_years,
+        ),
+        retired_interest_rate=FlatRateCurve(retired_interest_rate),
+        technical_discount_rate=FlatRateCurve(retired_interest_rate),
+        economic_discount_rate=FlatRateCurve(retired_interest_rate),
+        salary_growth_rate=FlatRateCurve(salary_growth_rate),
+        conversion_rate=from_dynamic_parameter(
+            conversion_rate,
+            start_year=start_year,
+            horizon_years=horizon_years,
+        ),
+        turnover_rate=turnover_rate,
+        capital_withdrawal_fraction=capital_withdrawal_fraction,
+        contribution_multiplier=contribution_multiplier,
+        mortality=MortalityAssumptions(mode="off"),
+        entry_policy=FixedEntryPolicy(entry),
+    )
+    return run_bvg_engine(initial_state=initial, assumptions=assumptions)
+
+
 def test_all_scalar_inputs_match_stage2a() -> None:
     initial = _default_portfolio()
-    stage2a = run_bvg_engine_stage2(
+    stage2a = run_bvg_engine_stage2c(
         initial,
         **PARAMS,
         salary_growth_rate=0.015,
@@ -130,11 +187,21 @@ def test_stage2c_trajectory_fields_have_horizon_length() -> None:
         retired_interest_rate=0.0176,
         conversion_rate=(0.068,),
     )
-    assert isinstance(result, Stage2CEngineResult)
-    assert result.active_interest_rate_trajectory == pytest.approx(
+    assert isinstance(result, BVGEngineResult)
+    active_curve = from_dynamic_parameter(
+        (0.0176, 0.015), start_year=2026, horizon_years=3
+    )
+    conversion_curve = from_dynamic_parameter(
+        (0.068,), start_year=2026, horizon_years=3
+    )
+    assert expand_curve(active_curve, start_year=2026, horizon_years=3) == pytest.approx(
         (0.0176, 0.015, 0.015)
     )
-    assert result.conversion_rate_trajectory == pytest.approx((0.068, 0.068, 0.068))
+    assert expand_curve(
+        conversion_curve,
+        start_year=2026,
+        horizon_years=3,
+    ) == pytest.approx((0.068, 0.068, 0.068))
 
 
 def test_invalid_sequence_length_raises() -> None:
@@ -156,5 +223,4 @@ def test_zero_horizon_preserves_schema_and_empty_trajectories() -> None:
     )
     assert result.cashflows.empty
     assert list(result.cashflows.columns) == list(CASHFLOW_COLUMNS)
-    assert result.active_interest_rate_trajectory == ()
-    assert result.conversion_rate_trajectory == ()
+    assert result.year_steps == ()

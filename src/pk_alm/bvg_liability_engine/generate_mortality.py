@@ -1,7 +1,11 @@
 import csv
 import math
 
-with open("src/pk_alm/bvg_liability_engine/mortality_table.csv", "w", newline="") as f:
+with open(
+    "src/pk_alm/bvg_liability_engine/actuarial_data/data/mortality_table.csv",
+    "w",
+    newline="",
+) as f:
     writer = csv.writer(f)
     writer.writerow(["age", "male_qx", "female_qx"])
     for age in range(121):

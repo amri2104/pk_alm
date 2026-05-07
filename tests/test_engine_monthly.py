@@ -97,7 +97,11 @@ def _aggregate_monthly_to_annual(df: pd.DataFrame) -> pd.DataFrame:
     return grouped.sort_values(["time", "contractId", "type"]).reset_index(drop=True)
 
 
-def test_monthly_emits_twelve_rows_per_annual_flow() -> None:
+_FLOWING_TYPES = {"PR", "RP"}
+_EVENT_TYPES = {"KA", "EX", "IN"}
+
+
+def test_monthly_splits_only_pr_rp_into_twelve_rows() -> None:
     initial = _portfolio()
     monthly = run_bvg_engine(
         initial_state=initial, assumptions=_base(frequency="monthly")
@@ -105,7 +109,36 @@ def test_monthly_emits_twelve_rows_per_annual_flow() -> None:
     annual = run_bvg_engine(
         initial_state=initial, assumptions=_base(frequency="annual")
     )
-    assert len(monthly.cashflows) == 12 * len(annual.cashflows)
+    annual_pr_rp = annual.cashflows[annual.cashflows["type"].isin(_FLOWING_TYPES)]
+    annual_events = annual.cashflows[annual.cashflows["type"].isin(_EVENT_TYPES)]
+    monthly_pr_rp = monthly.cashflows[monthly.cashflows["type"].isin(_FLOWING_TYPES)]
+    monthly_events = monthly.cashflows[monthly.cashflows["type"].isin(_EVENT_TYPES)]
+
+    assert len(monthly_pr_rp) == 12 * len(annual_pr_rp)
+    assert len(monthly_events) == len(annual_events)
+
+
+def test_monthly_event_cashflows_keep_year_end_timestamp() -> None:
+    initial = _portfolio()
+    monthly = run_bvg_engine(
+        initial_state=initial, assumptions=_base(frequency="monthly")
+    )
+    events = monthly.cashflows[monthly.cashflows["type"].isin(_EVENT_TYPES)]
+    if events.empty:
+        return
+    times = pd.to_datetime(events["time"])
+    assert (times.dt.month == 12).all()
+    assert (times.dt.day == 31).all()
+
+
+def test_monthly_pr_rp_timestamps_cover_jan_to_dec() -> None:
+    initial = _portfolio()
+    monthly = run_bvg_engine(
+        initial_state=initial, assumptions=_base(frequency="monthly")
+    )
+    pr_rp = monthly.cashflows[monthly.cashflows["type"].isin(_FLOWING_TYPES)]
+    months = sorted(pd.to_datetime(pr_rp["time"]).dt.month.unique())
+    assert months == list(range(1, 13))
 
 
 def test_monthly_aggregated_matches_annual() -> None:

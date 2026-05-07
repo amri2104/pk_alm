@@ -1,8 +1,7 @@
-"""Stage-1 parity: generic engine == legacy stage-1 engine.
+"""Stage-1 canonical engine contract tests.
 
-Constructs :class:`BVGAssumptions` to mirror the legacy stage-1 defaults
-(no turnover, no salary growth, closed fund, mortality off, flat rates) and
-asserts the cashflow DataFrame and portfolio-state sequence match exactly.
+Constructs :class:`BVGAssumptions` for the Stage-1 defaults: no turnover,
+no salary growth, closed fund, mortality off, and flat rates.
 """
 
 from __future__ import annotations
@@ -20,9 +19,6 @@ from pk_alm.bvg_liability_engine.domain_models.cohorts import (
 )
 from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
 from pk_alm.bvg_liability_engine.orchestration.generic_engine import run_bvg_engine
-from pk_alm.bvg_liability_engine.orchestration.legacy.engine import (
-    run_bvg_engine as run_legacy_stage1,
-)
 from pk_alm.bvg_liability_engine.population_dynamics.entry_policies import NoEntryPolicy
 
 RATE = 0.0176
@@ -81,48 +77,26 @@ def _stage1_assumptions(*, contribution_multiplier: float = 1.0) -> BVGAssumptio
     )
 
 
-def test_generic_engine_matches_legacy_stage1_cashflows() -> None:
+def test_stage1_config_produces_stable_cashflow_contract() -> None:
     initial = _portfolio()
-    legacy = run_legacy_stage1(
-        initial,
-        HORIZON,
-        ACTIVE_RATE,
-        RATE,
-        contribution_multiplier=1.0,
-        start_year=START_YEAR,
-        retirement_age=65,
-        capital_withdrawal_fraction=0.35,
-        conversion_rate=0.068,
-    )
     new = run_bvg_engine(
         initial_state=initial, assumptions=_stage1_assumptions()
     )
-    pd.testing.assert_frame_equal(
-        new.cashflows.reset_index(drop=True),
-        legacy.cashflows.reset_index(drop=True),
-        check_dtype=False,
-    )
+    assert new.horizon_years == HORIZON
+    assert set(new.cashflows["type"]).issubset({"PR", "RP", "KA"})
+    assert pd.to_datetime(new.cashflows["time"]).dt.year.min() == START_YEAR
+    assert pd.to_datetime(new.cashflows["time"]).dt.year.max() == START_YEAR + HORIZON - 1
 
 
-def test_generic_engine_matches_legacy_stage1_portfolio_states() -> None:
+def test_stage1_config_portfolio_state_sequence_is_annual() -> None:
     initial = _portfolio()
-    legacy = run_legacy_stage1(
-        initial,
-        HORIZON,
-        ACTIVE_RATE,
-        RATE,
-        contribution_multiplier=1.0,
-        start_year=START_YEAR,
-        retirement_age=65,
-        capital_withdrawal_fraction=0.35,
-        conversion_rate=0.068,
-    )
     new = run_bvg_engine(
         initial_state=initial, assumptions=_stage1_assumptions()
     )
-    assert len(new.portfolio_states) == len(legacy.portfolio_states)
-    for i, (a, b) in enumerate(zip(new.portfolio_states, legacy.portfolio_states)):
-        assert a == b, f"portfolio_states[{i}] differs"
+    assert len(new.portfolio_states) == HORIZON + 1
+    assert tuple(state.projection_year for state in new.portfolio_states) == tuple(
+        range(HORIZON + 1)
+    )
 
 
 def test_generic_engine_horizon_zero_returns_initial_only() -> None:

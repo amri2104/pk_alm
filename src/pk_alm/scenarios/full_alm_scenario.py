@@ -2,15 +2,15 @@
 
 This scenario glues the two engines:
 
-- BVG Liability Engine via :func:`run_stage1_baseline`.
+- BVG Liability Engine via the canonical assumptions-driven engine.
 - AAL Asset Engine via :func:`run_aal_asset_engine`.
 
 It concatenates both cashflow streams in the canonical CashflowRecord schema
 and recomputes annual cashflow analytics on the combined view. The default
 asset path is the required live AAL strategic engine.
 
-The scenario does not modify ``run_stage1_baseline(...)``, the BVG modules,
-or the seven default Stage-1 CSV outputs.
+The scenario does not modify ``run_stage1_baseline(...)`` or the seven
+default Stage-1 CSV outputs.
 """
 
 from __future__ import annotations
@@ -21,17 +21,36 @@ import pandas as pd
 
 from pk_alm.actus_asset_engine.aal_asset_portfolio import AssetSpec
 from pk_alm.alm_analytics_engine.cashflows import (
+    find_liquidity_inflection_year,
     summarize_cashflows_by_year,
     validate_annual_cashflow_dataframe,
+)
+from pk_alm.alm_analytics_engine.funding import build_funding_ratio_trajectory
+from pk_alm.alm_analytics_engine.funding_summary import (
+    funding_summary_to_dataframe,
+    summarize_funding_ratio,
 )
 from pk_alm.actus_asset_engine.aal_engine import (
     AALAssetEngineResult,
     run_aal_asset_engine,
 )
+from pk_alm.actus_asset_engine.deterministic import build_deterministic_asset_trajectory
+from pk_alm.bvg_liability_engine.assumptions import (
+    BVGAssumptions,
+    FlatRateCurve,
+    MortalityAssumptions,
+)
+from pk_alm.bvg_liability_engine.orchestration import run_bvg_engine
+from pk_alm.bvg_liability_engine.pension_logic.valuation import value_portfolio_states
+from pk_alm.bvg_liability_engine.population_dynamics.entry_policies import NoEntryPolicy
 from pk_alm.cashflows.schema import validate_cashflow_dataframe
+from pk_alm.scenarios.result_summary import (
+    build_scenario_result_summary,
+    scenario_result_summary_to_dataframe,
+)
 from pk_alm.scenarios.stage1_baseline import (
     Stage1BaselineResult,
-    run_stage1_baseline,
+    build_default_stage1_portfolio,
 )
 
 _COMBINED_SORT_COLUMNS = ("time", "source", "contractId", "type")
@@ -117,18 +136,86 @@ def run_full_alm_scenario(
     Asset-side ACTUS cashflows are generated through the required live AAL
     path. There is no fixture cashflow path.
     """
-    stage1_result = run_stage1_baseline(
-        scenario_id=scenario_id,
-        horizon_years=horizon_years,
+    initial_state = build_default_stage1_portfolio()
+    assumptions = BVGAssumptions(
         start_year=start_year,
-        active_interest_rate=active_interest_rate,
-        retired_interest_rate=retired_interest_rate,
-        technical_interest_rate=technical_interest_rate,
-        contribution_multiplier=contribution_multiplier,
+        horizon_years=horizon_years,
+        retirement_age=65,
         valuation_terminal_age=valuation_terminal_age,
+        active_crediting_rate=FlatRateCurve(active_interest_rate),
+        retired_interest_rate=FlatRateCurve(retired_interest_rate),
+        technical_discount_rate=FlatRateCurve(technical_interest_rate),
+        economic_discount_rate=FlatRateCurve(technical_interest_rate),
+        salary_growth_rate=FlatRateCurve(0.0),
+        conversion_rate=FlatRateCurve(0.068),
+        turnover_rate=0.0,
+        capital_withdrawal_fraction=0.35,
+        contribution_multiplier=contribution_multiplier,
+        mortality=MortalityAssumptions(mode="off"),
+        entry_policy=NoEntryPolicy(),
+    )
+    engine_result = run_bvg_engine(
+        initial_state=initial_state,
+        assumptions=assumptions,
+    )
+    validate_cashflow_dataframe(engine_result.cashflows)
+
+    valuation_snapshots = value_portfolio_states(
+        engine_result.portfolio_states,
+        technical_interest_rate,
+        valuation_terminal_age,
+    )
+    bvg_annual_cashflows = summarize_cashflows_by_year(engine_result.cashflows)
+    validate_annual_cashflow_dataframe(bvg_annual_cashflows)
+    asset_snapshots = build_deterministic_asset_trajectory(
+        valuation_snapshots,
+        bvg_annual_cashflows,
         target_funding_ratio=target_funding_ratio,
-        annual_asset_return=annual_asset_return,
-        output_dir=None,
+        annual_return_rate=annual_asset_return,
+        start_year=start_year,
+    )
+    funding_ratio_trajectory = build_funding_ratio_trajectory(
+        asset_snapshots,
+        valuation_snapshots,
+    )
+    funding_summary_obj = summarize_funding_ratio(
+        funding_ratio_trajectory,
+        target_funding_ratio=target_funding_ratio,
+    )
+    funding_summary = funding_summary_to_dataframe(funding_summary_obj)
+    inflection_structural = find_liquidity_inflection_year(
+        bvg_annual_cashflows,
+        use_structural=True,
+    )
+    inflection_net = find_liquidity_inflection_year(
+        bvg_annual_cashflows,
+        use_structural=False,
+    )
+    scenario_summary_obj = build_scenario_result_summary(
+        scenario_id=scenario_id,
+        valuation_snapshots=valuation_snapshots,
+        annual_cashflows=bvg_annual_cashflows,
+        asset_snapshots=asset_snapshots,
+        funding_ratio_trajectory=funding_ratio_trajectory,
+        funding_summary=funding_summary,
+        liquidity_inflection_year_structural=inflection_structural,
+        liquidity_inflection_year_net=inflection_net,
+    )
+    scenario_summary = scenario_result_summary_to_dataframe(scenario_summary_obj)
+    stage1_result = Stage1BaselineResult(
+        initial_state=initial_state,
+        engine_result=engine_result,
+        cashflows=engine_result.cashflows.copy(deep=True),
+        valuation_snapshots=valuation_snapshots,
+        annual_cashflows=bvg_annual_cashflows,
+        asset_snapshots=asset_snapshots,
+        funding_ratio_trajectory=funding_ratio_trajectory,
+        funding_summary=funding_summary,
+        scenario_summary=scenario_summary,
+        liquidity_inflection_year_structural=inflection_structural,
+        liquidity_inflection_year_net=inflection_net,
+        output_paths={},
+        actus_asset_trajectory=None,
     )
 
     aal_asset_result = run_aal_asset_engine(specs=asset_specs)

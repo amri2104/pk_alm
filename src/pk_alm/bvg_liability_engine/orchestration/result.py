@@ -63,3 +63,7 @@ class BVGEngineResult:
     @property
     def horizon_years(self) -> int:
         return len(self.portfolio_states) - 1
+
+    @property
+    def cashflow_count(self) -> int:
+        return len(self.cashflows)

@@ -5,8 +5,14 @@ import pandas as pd
 import pytest
 
 from pk_alm.actus_asset_engine.deterministic import build_deterministic_asset_trajectory
-from pk_alm.bvg_liability_engine.orchestration.engine_stage2 import run_bvg_engine_stage2
+from pk_alm.bvg_liability_engine.assumptions import (
+    BVGAssumptions,
+    FlatRateCurve,
+    MortalityAssumptions,
+)
+from pk_alm.bvg_liability_engine.orchestration import run_bvg_engine
 from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import EntryAssumptions
+from pk_alm.bvg_liability_engine.population_dynamics.entry_policies import FixedEntryPolicy
 from pk_alm.bvg_liability_engine.pension_logic.valuation import value_portfolio_states
 from pk_alm.scenarios.stage2c_dynamic_parameters import (
     PARAMETER_TRAJECTORY_COLUMNS,
@@ -84,17 +90,25 @@ def test_stage2c_does_not_touch_protected_output_directories(tmp_path: Path) -> 
 
 def test_scalar_inputs_reproduce_stage2a_core_outputs() -> None:
     initial = build_default_initial_portfolio_stage2c()
-    stage2a_engine = run_bvg_engine_stage2(
-        initial,
-        horizon_years=12,
-        active_interest_rate=0.0176,
-        retired_interest_rate=0.0176,
-        salary_growth_rate=0.015,
-        turnover_rate=0.02,
-        entry_assumptions=EntryAssumptions(),
-        contribution_multiplier=1.4,
+    assumptions = BVGAssumptions(
         start_year=2026,
-        conversion_rate=0.068,
+        horizon_years=12,
+        retirement_age=65,
+        valuation_terminal_age=90,
+        active_crediting_rate=FlatRateCurve(0.0176),
+        retired_interest_rate=FlatRateCurve(0.0176),
+        technical_discount_rate=FlatRateCurve(0.0176),
+        economic_discount_rate=FlatRateCurve(0.0176),
+        salary_growth_rate=FlatRateCurve(0.015),
+        conversion_rate=FlatRateCurve(0.068),
+        turnover_rate=0.02,
+        contribution_multiplier=1.4,
+        mortality=MortalityAssumptions(mode="off"),
+        entry_policy=FixedEntryPolicy(EntryAssumptions()),
+    )
+    stage2a_engine = run_bvg_engine(
+        initial_state=initial,
+        assumptions=assumptions,
     )
     stage2a_valuation = value_portfolio_states(
         stage2a_engine.portfolio_states,

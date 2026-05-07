@@ -39,9 +39,15 @@ from pk_alm.actus_asset_engine.deterministic import (
 )
 from pk_alm.actus_asset_engine.aal_engine import run_aal_asset_engine
 from pk_alm.actus_asset_engine.actus_trajectory import compute_actus_asset_trajectory
+from pk_alm.bvg_liability_engine.assumptions import (
+    BVGAssumptions,
+    FlatRateCurve,
+    MortalityAssumptions,
+)
 from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort, RetiredCohort
-from pk_alm.bvg_liability_engine.orchestration.engine import BVGEngineResult, run_bvg_engine
 from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
+from pk_alm.bvg_liability_engine.orchestration import BVGEngineResult, run_bvg_engine
+from pk_alm.bvg_liability_engine.population_dynamics.entry_policies import NoEntryPolicy
 from pk_alm.bvg_liability_engine.pension_logic.valuation import (
     validate_valuation_dataframe,
     value_portfolio_states,
@@ -440,16 +446,25 @@ def run_stage1_baseline(
     )
     initial_state = build_default_stage1_portfolio()
 
-    engine_result = run_bvg_engine(
-        initial_state=initial_state,
-        horizon_years=horizon_years,
-        active_interest_rate=active_interest_rate,
-        retired_interest_rate=retired_interest_rate,
-        contribution_multiplier=contribution_multiplier,
+    assumptions = BVGAssumptions(
         start_year=start_year,
+        horizon_years=horizon_years,
         retirement_age=retirement_age,
+        valuation_terminal_age=valuation_terminal_age,
+        active_crediting_rate=FlatRateCurve(active_interest_rate),
+        retired_interest_rate=FlatRateCurve(retired_interest_rate),
+        technical_discount_rate=FlatRateCurve(technical_interest_rate),
+        economic_discount_rate=FlatRateCurve(technical_interest_rate),
+        salary_growth_rate=FlatRateCurve(0.0),
+        conversion_rate=FlatRateCurve(conversion_rate),
+        turnover_rate=0.0,
         capital_withdrawal_fraction=capital_withdrawal_fraction,
-        conversion_rate=conversion_rate,
+        contribution_multiplier=contribution_multiplier,
+        mortality=MortalityAssumptions(mode="off"),
+        entry_policy=NoEntryPolicy(),
+    )
+    engine_result = run_bvg_engine(
+        initial_state=initial_state, assumptions=assumptions
     )
     validate_cashflow_dataframe(engine_result.cashflows)
 

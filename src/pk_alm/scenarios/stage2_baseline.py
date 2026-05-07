@@ -44,9 +44,23 @@ from pk_alm.actus_asset_engine.deterministic import (
     build_deterministic_asset_trajectory,
     validate_asset_dataframe,
 )
-from pk_alm.bvg_liability_engine.orchestration.engine_stage2 import Stage2EngineResult, run_bvg_engine_stage2
-from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import EntryAssumptions
+from pk_alm.bvg_liability_engine.assumptions import (
+    BVGAssumptions,
+    FlatRateCurve,
+    MortalityAssumptions,
+)
 from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
+from pk_alm.bvg_liability_engine.orchestration import BVGEngineResult, run_bvg_engine
+from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import (
+    EntryAssumptions,
+    get_default_entry_assumptions,
+)
+from pk_alm.bvg_liability_engine.population_dynamics.entry_policies import (
+    FixedEntryPolicy,
+)
+from pk_alm.bvg_liability_engine.population_dynamics.turnover import (
+    apply_turnover_to_portfolio,
+)
 from pk_alm.bvg_liability_engine.pension_logic.valuation import (
     validate_valuation_dataframe,
     value_portfolio_states,
@@ -108,7 +122,7 @@ class Stage2BaselineResult:
     """
 
     scenario_id: str
-    engine_result: Stage2EngineResult
+    engine_result: BVGEngineResult
     cashflows: pd.DataFrame
     valuation_snapshots: pd.DataFrame
     annual_cashflows: pd.DataFrame
@@ -124,9 +138,9 @@ class Stage2BaselineResult:
     def __post_init__(self) -> None:
         if not isinstance(self.scenario_id, str) or not self.scenario_id.strip():
             raise ValueError("scenario_id must be a non-empty string")
-        if not isinstance(self.engine_result, Stage2EngineResult):
+        if not isinstance(self.engine_result, BVGEngineResult):
             raise TypeError(
-                "engine_result must be Stage2EngineResult, "
+                "engine_result must be BVGEngineResult, "
                 f"got {type(self.engine_result).__name__}"
             )
         _validate_dataframe(self.cashflows, "cashflows")
@@ -249,17 +263,33 @@ def run_stage2_baseline(
     if not isinstance(initial_state, BVGPortfolioState):
         raise TypeError("Stage-2 default portfolio must be BVGPortfolioState")
 
-    engine_result = run_bvg_engine_stage2(
-        initial_state=initial_state,
-        horizon_years=horizon_years,
-        active_interest_rate=active_interest_rate,
-        retired_interest_rate=retired_interest_rate,
-        salary_growth_rate=salary_growth_rate,
-        turnover_rate=turnover_rate,
-        entry_assumptions=entry_assumptions,
-        contribution_multiplier=contribution_multiplier,
-        start_year=start_year,
+    resolved_entry = (
+        entry_assumptions
+        if entry_assumptions is not None
+        else get_default_entry_assumptions()
     )
+    assumptions = BVGAssumptions(
+        start_year=start_year,
+        horizon_years=horizon_years,
+        retirement_age=65,
+        valuation_terminal_age=valuation_terminal_age,
+        active_crediting_rate=FlatRateCurve(active_interest_rate),
+        retired_interest_rate=FlatRateCurve(retired_interest_rate),
+        technical_discount_rate=FlatRateCurve(technical_interest_rate),
+        economic_discount_rate=FlatRateCurve(technical_interest_rate),
+        salary_growth_rate=FlatRateCurve(salary_growth_rate),
+        conversion_rate=FlatRateCurve(0.068),
+        turnover_rate=turnover_rate,
+        capital_withdrawal_fraction=0.35,
+        contribution_multiplier=contribution_multiplier,
+        mortality=MortalityAssumptions(mode="off"),
+        entry_policy=FixedEntryPolicy(resolved_entry),
+    )
+    engine_result = run_bvg_engine(
+        initial_state=initial_state, assumptions=assumptions
+    )
+    engine_result_entry_assumptions = resolved_entry
+    engine_result_turnover_rate = turnover_rate
     validate_cashflow_dataframe(engine_result.cashflows)
 
     valuation_snapshots = value_portfolio_states(
@@ -330,7 +360,9 @@ def run_stage2_baseline(
     scenario_summary = scenario_result_summary_to_dataframe(scenario_summary_obj)
     validate_scenario_result_dataframe(scenario_summary)
 
-    demographic_summary = _build_demographic_summary(engine_result)
+    demographic_summary = _build_demographic_summary(
+        engine_result, turnover_rate=engine_result_turnover_rate
+    )
     cashflows_by_type = _build_cashflows_by_type(cashflows)
 
     resolved_output_dir: Path | None = None
@@ -392,19 +424,24 @@ CASHFLOWS_BY_TYPE_COLUMNS = (
 )
 
 
-def _build_demographic_summary(engine_result: Stage2EngineResult) -> pd.DataFrame:
+def _build_demographic_summary(
+    engine_result: BVGEngineResult, *, turnover_rate: float
+) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
-    for year_idx in range(engine_result.horizon_years):
+    for year_idx, year_step in enumerate(engine_result.year_steps):
         end_state = engine_result.portfolio_states[year_idx + 1]
+        residual = apply_turnover_to_portfolio(
+            year_step.opening_state,
+            turnover_rate,
+            pd.Timestamp(f"{year_step.year}-12-31"),
+        ).rounding_residual_count
         rows.append(
             {
                 "projection_year": year_idx + 1,
-                "entries": engine_result.per_year_entries[year_idx],
-                "exits": engine_result.per_year_exits[year_idx],
-                "retirements": engine_result.per_year_retirements[year_idx],
-                "turnover_residual": (
-                    engine_result.turnover_rounding_residual_count[year_idx]
-                ),
+                "entries": year_step.entry_count,
+                "exits": year_step.exited_count,
+                "retirements": year_step.retired_count,
+                "turnover_residual": residual,
                 "active_count_end": end_state.active_count_total,
                 "retired_count_end": end_state.retired_count_total,
             }

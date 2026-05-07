@@ -32,11 +32,33 @@ from pk_alm.actus_asset_engine.deterministic import (
     build_deterministic_asset_trajectory,
     validate_asset_dataframe,
 )
+from collections.abc import Sequence
+
+from pk_alm.bvg_liability_engine.assumptions import (
+    BVGAssumptions,
+    FlatRateCurve,
+    MortalityAssumptions,
+    RateCurve,
+)
+from pk_alm.bvg_liability_engine.assumptions.rate_curves import (
+    expand as expand_curve,
+    from_dynamic_parameter,
+)
 from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort, RetiredCohort
-from pk_alm.bvg_liability_engine.actuarial_assumptions.dynamic_parameters import DynamicParameter, expand_parameter
-from pk_alm.bvg_liability_engine.orchestration.engine_stage2c import Stage2CEngineResult, run_bvg_engine_stage2c
-from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import EntryAssumptions
 from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
+from pk_alm.bvg_liability_engine.orchestration import BVGEngineResult, run_bvg_engine
+from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import (
+    EntryAssumptions,
+    get_default_entry_assumptions,
+)
+from pk_alm.bvg_liability_engine.population_dynamics.entry_policies import (
+    FixedEntryPolicy,
+)
+from pk_alm.bvg_liability_engine.population_dynamics.turnover import (
+    apply_turnover_to_portfolio,
+)
+
+DynamicLike = float | Sequence[float] | RateCurve
 from pk_alm.bvg_liability_engine.pension_logic.valuation import validate_valuation_dataframe
 from pk_alm.bvg_liability_engine.pension_logic.valuation_dynamic import value_portfolio_states_dynamic
 from pk_alm.cashflows.schema import validate_cashflow_dataframe
@@ -98,7 +120,7 @@ class Stage2CResult:
     """Frozen result container for one Stage-2C dynamic-parameter run."""
 
     scenario_id: str
-    engine_result: Stage2CEngineResult
+    engine_result: BVGEngineResult
     cashflows: pd.DataFrame
     valuation_snapshots: pd.DataFrame
     annual_cashflows: pd.DataFrame
@@ -115,8 +137,8 @@ class Stage2CResult:
     def __post_init__(self) -> None:
         if not isinstance(self.scenario_id, str) or not self.scenario_id.strip():
             raise ValueError("scenario_id must be a non-empty string")
-        if not isinstance(self.engine_result, Stage2CEngineResult):
-            raise TypeError("engine_result must be Stage2CEngineResult")
+        if not isinstance(self.engine_result, BVGEngineResult):
+            raise TypeError("engine_result must be BVGEngineResult")
         validate_cashflow_dataframe(self.cashflows)
         validate_valuation_dataframe(self.valuation_snapshots)
         validate_annual_cashflow_dataframe(self.annual_cashflows)
@@ -171,9 +193,9 @@ def run_stage2c_dynamic_parameters(
     scenario_id: str = "stage2c_dynamic_parameters",
     horizon_years: int = 12,
     start_year: int = 2026,
-    active_interest_rate: DynamicParameter = 0.0176,
+    active_interest_rate: DynamicLike = 0.0176,
     retired_interest_rate: float = 0.0176,
-    technical_interest_rate: DynamicParameter = 0.0176,
+    technical_interest_rate: DynamicLike = 0.0176,
     contribution_multiplier: float = 1.4,
     valuation_terminal_age: int = 90,
     target_funding_ratio: float = 1.076,
@@ -181,7 +203,7 @@ def run_stage2c_dynamic_parameters(
     salary_growth_rate: float = 0.015,
     turnover_rate: float = 0.02,
     entry_assumptions: EntryAssumptions | None = None,
-    conversion_rate: DynamicParameter = 0.068,
+    conversion_rate: DynamicLike = 0.068,
     asset_mode: AssetMode = ASSET_MODE_DETERMINISTIC,
     asset_specs: tuple[AssetSpec, ...] | list[AssetSpec] | None = None,
     output_dir: str | Path | None = "outputs/stage2c_dynamic_parameters",
@@ -198,24 +220,51 @@ def run_stage2c_dynamic_parameters(
         raise ValueError("scenario_id must be a non-empty string")
 
     initial_state = build_default_initial_portfolio_stage2c()
-    engine_result = run_bvg_engine_stage2c(
-        initial_state=initial_state,
-        horizon_years=horizon_years,
-        active_interest_rate=active_interest_rate,
-        retired_interest_rate=retired_interest_rate,
-        salary_growth_rate=salary_growth_rate,
-        turnover_rate=turnover_rate,
-        entry_assumptions=entry_assumptions,
-        contribution_multiplier=contribution_multiplier,
-        start_year=start_year,
-        conversion_rate=conversion_rate,
+    resolved_entry = (
+        entry_assumptions
+        if entry_assumptions is not None
+        else get_default_entry_assumptions()
     )
+    safe_horizon = max(horizon_years, 1)
+    active_curve = _to_rate_curve(
+        active_interest_rate, start_year=start_year, horizon_years=safe_horizon
+    )
+    conversion_curve = _to_rate_curve(
+        conversion_rate, start_year=start_year, horizon_years=safe_horizon
+    )
+    technical_curve = _to_rate_curve(
+        technical_interest_rate,
+        start_year=start_year,
+        horizon_years=safe_horizon,
+    )
+    assumptions = BVGAssumptions(
+        start_year=start_year,
+        horizon_years=horizon_years,
+        retirement_age=65,
+        valuation_terminal_age=valuation_terminal_age,
+        active_crediting_rate=active_curve,
+        retired_interest_rate=FlatRateCurve(retired_interest_rate),
+        technical_discount_rate=technical_curve,
+        economic_discount_rate=technical_curve,
+        salary_growth_rate=FlatRateCurve(salary_growth_rate),
+        conversion_rate=conversion_curve,
+        turnover_rate=turnover_rate,
+        capital_withdrawal_fraction=0.35,
+        contribution_multiplier=contribution_multiplier,
+        mortality=MortalityAssumptions(mode="off"),
+        entry_policy=FixedEntryPolicy(resolved_entry),
+    )
+    engine_result = run_bvg_engine(
+        initial_state=initial_state, assumptions=assumptions
+    )
+    engine_result_turnover_rate = turnover_rate
     validate_cashflow_dataframe(engine_result.cashflows)
 
     valuation_snapshots = value_portfolio_states_dynamic(
         engine_result.portfolio_states,
         technical_interest_rate,
         valuation_terminal_age,
+        start_year=start_year,
     )
     validate_valuation_dataframe(valuation_snapshots)
 
@@ -279,9 +328,12 @@ def run_stage2c_dynamic_parameters(
     scenario_summary = scenario_result_summary_to_dataframe(scenario_summary_obj)
     validate_scenario_result_dataframe(scenario_summary)
 
-    demographic_summary = _build_demographic_summary(engine_result)
+    demographic_summary = _build_demographic_summary(
+        engine_result, turnover_rate=engine_result_turnover_rate
+    )
     cashflows_by_type = _build_cashflows_by_type(cashflows)
     parameter_trajectory = _build_parameter_trajectory(
+        start_year=start_year,
         horizon_years=engine_result.horizon_years,
         conversion_rate=conversion_rate,
         active_interest_rate=active_interest_rate,
@@ -332,25 +384,60 @@ def run_stage2c_dynamic_parameters(
     )
 
 
+def _to_rate_curve(
+    value: DynamicLike, *, start_year: int, horizon_years: int
+) -> RateCurve:
+    if isinstance(value, RateCurve):
+        return value
+    return from_dynamic_parameter(
+        value, start_year=start_year, horizon_years=horizon_years
+    )
+
+
+def _materialize_curve(
+    value: DynamicLike, *, start_year: int, horizon_years: int
+) -> tuple[float, ...]:
+    curve = _to_rate_curve(
+        value, start_year=start_year, horizon_years=horizon_years
+    )
+    return expand_curve(
+        curve, start_year=start_year, horizon_years=horizon_years
+    )
+
+
 def _build_parameter_trajectory(
     *,
+    start_year: int,
     horizon_years: int,
-    conversion_rate: DynamicParameter,
-    active_interest_rate: DynamicParameter,
-    technical_interest_rate: DynamicParameter,
+    conversion_rate: DynamicLike,
+    active_interest_rate: DynamicLike,
+    technical_interest_rate: DynamicLike,
 ) -> pd.DataFrame:
     snapshot_count = horizon_years + 1
-    conversion = _expand_engine_parameter_for_snapshots(
-        conversion_rate, horizon_years, "conversion_rate"
+    materialize_horizon = max(horizon_years, 1)
+    engine_active = _materialize_curve(
+        active_interest_rate,
+        start_year=start_year,
+        horizon_years=materialize_horizon,
     )
-    active = _expand_engine_parameter_for_snapshots(
-        active_interest_rate, horizon_years, "active_interest_rate"
+    engine_conversion = _materialize_curve(
+        conversion_rate,
+        start_year=start_year,
+        horizon_years=materialize_horizon,
     )
-    technical = expand_parameter(
+    technical = _materialize_curve(
         technical_interest_rate,
-        snapshot_count,
-        "technical_interest_rate",
+        start_year=start_year,
+        horizon_years=snapshot_count,
     )
+
+    if horizon_years == 0:
+        active = engine_active
+        conversion = engine_conversion
+    else:
+        active = engine_active + (engine_active[-1],)
+        conversion = engine_conversion + (engine_conversion[-1],)
+
     df = pd.DataFrame(
         {
             "projection_year": list(range(snapshot_count)),
@@ -364,30 +451,24 @@ def _build_parameter_trajectory(
     return df
 
 
-def _expand_engine_parameter_for_snapshots(
-    value: DynamicParameter,
-    horizon_years: int,
-    name: str,
-) -> tuple[float, ...]:
-    if horizon_years == 0:
-        return expand_parameter(value, 1, name)
-    engine_values = expand_parameter(value, horizon_years, name)
-    return engine_values + (engine_values[-1],)
-
-
-def _build_demographic_summary(engine_result: Stage2CEngineResult) -> pd.DataFrame:
+def _build_demographic_summary(
+    engine_result: BVGEngineResult, *, turnover_rate: float
+) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
-    for year_idx in range(engine_result.horizon_years):
+    for year_idx, year_step in enumerate(engine_result.year_steps):
         end_state = engine_result.portfolio_states[year_idx + 1]
+        residual = apply_turnover_to_portfolio(
+            year_step.opening_state,
+            turnover_rate,
+            pd.Timestamp(f"{year_step.year}-12-31"),
+        ).rounding_residual_count
         rows.append(
             {
                 "projection_year": year_idx + 1,
-                "entries": engine_result.per_year_entries[year_idx],
-                "exits": engine_result.per_year_exits[year_idx],
-                "retirements": engine_result.per_year_retirements[year_idx],
-                "turnover_residual": (
-                    engine_result.turnover_rounding_residual_count[year_idx]
-                ),
+                "entries": year_step.entry_count,
+                "exits": year_step.exited_count,
+                "retirements": year_step.retired_count,
+                "turnover_residual": residual,
                 "active_count_end": end_state.active_count_total,
                 "retired_count_end": end_state.retired_count_total,
             }

@@ -219,12 +219,18 @@ def run_bvg_engine(
         validate_cashflow_dataframe(annual_year_df)
 
         if assumptions.cashflow_frequency == "monthly":
-            year_df = _split_monthly(annual_year_df, periods=12)
-            validate_cashflow_dataframe(year_df)
+            # Only PR and RP split into 12 monthly rows. KA / EX / IN are
+            # event-driven retirement / exit / entry flows; they stay on the
+            # year-end timestamp.
             regular_df_out = _split_monthly(regular_df, periods=12)
-            ex_df_out = _split_monthly(ex_df, periods=12)
-            retire_df_out = _split_monthly(retire_df, periods=12)
-            in_df_out = _split_monthly(in_df, periods=12)
+            ex_df_out = ex_df
+            retire_df_out = retire_df
+            in_df_out = in_df
+            year_df = pd.concat(
+                [regular_df_out, ex_df_out, retire_df_out, in_df_out],
+                ignore_index=True,
+            )
+            validate_cashflow_dataframe(year_df)
         else:
             year_df = annual_year_df
             regular_df_out = regular_df

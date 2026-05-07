@@ -29,8 +29,22 @@ from pk_alm.alm_analytics_engine.stochastic_aggregation import (
     validate_mc_metadata,
     validate_rate_paths_summary,
 )
-from pk_alm.bvg_liability_engine.orchestration.engine_stage2d import Stage2DEngineResult, run_bvg_engine_stage2d
-from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import EntryAssumptions
+from pk_alm.bvg_liability_engine.assumptions import (
+    BVGAssumptions,
+    FlatRateCurve,
+    MortalityAssumptions,
+)
+from pk_alm.bvg_liability_engine.orchestration.stochastic_runner import (
+    BVGStochasticResult,
+    run_stochastic_bvg_engine,
+)
+from pk_alm.bvg_liability_engine.population_dynamics.entry_dynamics import (
+    EntryAssumptions,
+    get_default_entry_assumptions,
+)
+from pk_alm.bvg_liability_engine.population_dynamics.entry_policies import (
+    FixedEntryPolicy,
+)
 from pk_alm.scenarios.stage2c_dynamic_parameters import (
     build_default_initial_portfolio_stage2c,
 )
@@ -62,7 +76,7 @@ class Stage2DStochasticResult:
     """Frozen result container for one Stage-2D stochastic-rate run."""
 
     scenario_id: str
-    engine_result: Stage2DEngineResult
+    engine_result: BVGStochasticResult
     rate_paths_technical: np.ndarray
     funding_ratio_percentiles: pd.DataFrame
     funding_ratio_summary: pd.DataFrame
@@ -74,8 +88,8 @@ class Stage2DStochasticResult:
     def __post_init__(self) -> None:
         if not isinstance(self.scenario_id, str) or not self.scenario_id.strip():
             raise ValueError("scenario_id must be a non-empty string")
-        if not isinstance(self.engine_result, Stage2DEngineResult):
-            raise TypeError("engine_result must be Stage2DEngineResult")
+        if not isinstance(self.engine_result, BVGStochasticResult):
+            raise TypeError("engine_result must be BVGStochasticResult")
         if not isinstance(self.rate_paths_technical, np.ndarray):
             raise TypeError("rate_paths_technical must be numpy.ndarray")
         expected_shape = (
@@ -159,17 +173,32 @@ def run_stage2d_stochastic(
     )
 
     initial_state = build_default_initial_portfolio_stage2c()
-    engine_result = run_bvg_engine_stage2d(
-        initial_state=initial_state,
-        horizon_years=horizon,
-        rate_paths_active=rate_paths_active,
-        retired_interest_rate=retired_interest_rate,
-        salary_growth_rate=salary_growth_rate,
-        turnover_rate=turnover_rate,
-        entry_assumptions=entry_assumptions,
-        contribution_multiplier=contribution_multiplier,
+    resolved_entry = (
+        entry_assumptions
+        if entry_assumptions is not None
+        else get_default_entry_assumptions()
+    )
+    base_assumptions = BVGAssumptions(
         start_year=start_year,
-        conversion_rate=conversion_rate,
+        horizon_years=horizon,
+        retirement_age=65,
+        valuation_terminal_age=valuation_terminal_age,
+        active_crediting_rate=FlatRateCurve(0.0),  # overridden per path
+        retired_interest_rate=FlatRateCurve(retired_interest_rate),
+        technical_discount_rate=FlatRateCurve(retired_interest_rate),
+        economic_discount_rate=FlatRateCurve(retired_interest_rate),
+        salary_growth_rate=FlatRateCurve(salary_growth_rate),
+        conversion_rate=FlatRateCurve(conversion_rate),
+        turnover_rate=turnover_rate,
+        capital_withdrawal_fraction=0.35,
+        contribution_multiplier=contribution_multiplier,
+        mortality=MortalityAssumptions(mode="off"),
+        entry_policy=FixedEntryPolicy(resolved_entry),
+    )
+    engine_result = run_stochastic_bvg_engine(
+        initial_state=initial_state,
+        assumptions=base_assumptions,
+        rate_paths_active=rate_paths_active,
         model_active=active_model_key,
     )
 

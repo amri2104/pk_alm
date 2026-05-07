@@ -2,12 +2,60 @@ import math
 
 import pandas as pd
 import pytest
+from pk_alm.bvg_liability_engine.assumptions import (
+    BVGAssumptions,
+    FlatRateCurve,
+    MortalityAssumptions,
+)
 from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort, RetiredCohort
-from pk_alm.bvg_liability_engine.orchestration.engine import BVGEngineResult, run_bvg_engine
+from pk_alm.bvg_liability_engine.orchestration import BVGEngineResult
+from pk_alm.bvg_liability_engine.orchestration import run_bvg_engine as _run_bvg_engine
 from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
+from pk_alm.bvg_liability_engine.population_dynamics.entry_policies import NoEntryPolicy
 from pk_alm.cashflows.schema import CASHFLOW_COLUMNS, validate_cashflow_dataframe
 
 RATE = 0.0176
+
+
+def run_bvg_engine(
+    initial_state,
+    horizon_years,
+    active_interest_rate,
+    retired_interest_rate,
+    contribution_multiplier=1.0,
+    start_year=2026,
+    retirement_age=65,
+    capital_withdrawal_fraction=0.35,
+    conversion_rate=0.068,
+):
+    if active_interest_rate <= -1:
+        raise ValueError("active_interest_rate must be > -1")
+    if retired_interest_rate <= -1:
+        raise ValueError("retired_interest_rate must be > -1")
+    if isinstance(start_year, bool):
+        raise TypeError("start_year must not be bool")
+    if start_year < 2000:
+        raise ValueError("start_year must be >= 2000")
+    if conversion_rate < 0:
+        raise ValueError("conversion_rate must be >= 0")
+    assumptions = BVGAssumptions(
+        start_year=start_year,
+        horizon_years=horizon_years,
+        retirement_age=retirement_age,
+        valuation_terminal_age=max(retirement_age, 1) + 1,
+        active_crediting_rate=FlatRateCurve(active_interest_rate),
+        retired_interest_rate=FlatRateCurve(retired_interest_rate),
+        technical_discount_rate=FlatRateCurve(retired_interest_rate),
+        economic_discount_rate=FlatRateCurve(retired_interest_rate),
+        salary_growth_rate=FlatRateCurve(0.0),
+        conversion_rate=FlatRateCurve(conversion_rate),
+        turnover_rate=0.0,
+        capital_withdrawal_fraction=capital_withdrawal_fraction,
+        contribution_multiplier=contribution_multiplier,
+        mortality=MortalityAssumptions(mode="off"),
+        entry_policy=NoEntryPolicy(),
+    )
+    return _run_bvg_engine(initial_state=initial_state, assumptions=assumptions)
 
 # ---------------------------------------------------------------------------
 # Standard test portfolio
@@ -260,6 +308,8 @@ def test_result_is_frozen():
 def test_result_validation_empty_states_raises():
     with pytest.raises(ValueError):
         BVGEngineResult(
+            assumptions=BVGAssumptions(),
+            year_steps=(),
             portfolio_states=(),
             cashflows=pd.DataFrame(columns=list(CASHFLOW_COLUMNS)),
         )
@@ -268,6 +318,8 @@ def test_result_validation_empty_states_raises():
 def test_result_validation_wrong_states_type_raises():
     with pytest.raises(TypeError):
         BVGEngineResult(
+            assumptions=BVGAssumptions(),
+            year_steps=(),
             portfolio_states=[_standard_portfolio()],  # list, not tuple
             cashflows=pd.DataFrame(columns=list(CASHFLOW_COLUMNS)),
         )
@@ -276,6 +328,8 @@ def test_result_validation_wrong_states_type_raises():
 def test_result_validation_wrong_cashflows_type_raises():
     with pytest.raises(TypeError):
         BVGEngineResult(
+            assumptions=BVGAssumptions(),
+            year_steps=(),
             portfolio_states=(_standard_portfolio(),),
             cashflows="not a dataframe",  # type: ignore[arg-type]
         )

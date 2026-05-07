@@ -19,7 +19,9 @@ from pk_alm.alm_analytics_engine.distributional import (
 )
 from pk_alm.alm_analytics_engine.funding import build_funding_ratio_trajectory
 from pk_alm.actus_asset_engine.deterministic import build_deterministic_asset_trajectory
-from pk_alm.bvg_liability_engine.orchestration.engine_stage2d import Stage2DEngineResult
+from pk_alm.bvg_liability_engine.orchestration.stochastic_runner import (
+    BVGStochasticResult,
+)
 from pk_alm.bvg_liability_engine.pension_logic.valuation_dynamic import value_portfolio_states_dynamic
 
 FUNDING_RATIO_PERCENTILE_COLUMNS = (
@@ -90,7 +92,7 @@ class Stage2DAggregationResult:
 
 def aggregate_stage2d_outputs(
     *,
-    engine_result: Stage2DEngineResult,
+    engine_result: BVGStochasticResult,
     rate_paths_technical: np.ndarray,
     scenario_id: str,
     model_technical: str,
@@ -104,8 +106,8 @@ def aggregate_stage2d_outputs(
     annual_asset_return: float,
 ) -> Stage2DAggregationResult:
     """Aggregate path-level Stage-2D outputs into the public CSV tables."""
-    if not isinstance(engine_result, Stage2DEngineResult):
-        raise TypeError("engine_result must be Stage2DEngineResult")
+    if not isinstance(engine_result, BVGStochasticResult):
+        raise TypeError("engine_result must be BVGStochasticResult")
     technical_paths = _validate_technical_paths(
         rate_paths_technical,
         engine_result.n_paths,
@@ -116,11 +118,12 @@ def aggregate_stage2d_outputs(
     funding_ratio_decimal_paths: list[np.ndarray] = []
     inflection_years: list[int] = []
 
-    for path_result in engine_result.path_results:
+    for path_index, path_result in enumerate(engine_result.path_results):
         valuation_snapshots = value_portfolio_states_dynamic(
             path_result.portfolio_states,
-            tuple(float(v) for v in technical_paths[path_result.path_index]),
+            tuple(float(v) for v in technical_paths[path_index]),
             valuation_terminal_age,
+            start_year=start_year,
         )
         annual_cashflows = summarize_cashflows_by_year(path_result.cashflows)
         asset_snapshots = build_deterministic_asset_trajectory(

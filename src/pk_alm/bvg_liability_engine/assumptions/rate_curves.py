@@ -1,9 +1,9 @@
 """Rate-curve abstraction for BVG engine assumptions.
 
-Replaces the legacy ``DynamicParameter`` (scalar | sequence) with explicit
-curve types. Engine code calls ``curve.value_at(year, period)`` once per
-projection step. ``period`` is the intra-year sub-step index (0 for annual
-mode; 0..11 for monthly mode).
+Scalar and sequence inputs are converted into explicit curve types. Engine
+code calls ``curve.value_at(year, period)`` once per projection step.
+``period`` is the intra-year sub-step index (0 for annual mode; 0..11 for
+monthly mode).
 """
 
 from __future__ import annotations
@@ -31,6 +31,8 @@ def _validate_rate(value: object, name: str) -> float:
     fval = float(value)
     if math.isnan(fval):
         raise ValueError(f"{name} must not be NaN")
+    if fval < 0.0:
+        raise ValueError(f"{name} must be >= 0, got {fval}")
     return fval
 
 
@@ -113,7 +115,7 @@ def from_dynamic_parameter(
     start_year: int,
     horizon_years: int,
 ) -> RateCurve:
-    """Build a RateCurve from a legacy ``DynamicParameter``.
+    """Build a RateCurve from a scalar or sequence input.
 
     Scalars become :class:`FlatRateCurve`. Sequences become a
     :class:`StepRateCurve` keyed by ``start_year + offset``; the last value is
@@ -131,9 +133,9 @@ def from_dynamic_parameter(
             raise ValueError(
                 f"rate sequence length ({len(value)}) must be <= horizon_years ({horizon})"
             )
-        rates = {start_year + i: float(v) for i, v in enumerate(value)}
+        rates = {start_year + i: v for i, v in enumerate(value)}
         return StepRateCurve(rates=rates)
-    return FlatRateCurve(rate=float(value))
+    return FlatRateCurve(rate=_validate_rate(value, "rate"))
 
 
 def expand(curve: RateCurve, *, start_year: int, horizon_years: int) -> tuple[float, ...]:

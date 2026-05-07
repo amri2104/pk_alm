@@ -109,7 +109,7 @@ def load_ek0105_table(table_id: str = DEFAULT_EK0105_TABLE_ID) -> MortalityTable
         raise ValueError(
             f"table_id must be one of {SUPPORTED_EK0105_TABLE_IDS}, got {table_id!r}"
         )
-    package = "pk_alm.bvg_liability_engine.actuarial_assumptions.data"
+    package = "pk_alm.bvg_liability_engine.actuarial_data.data"
     with resources.files(package).joinpath(_TABLE_FILES[table_id]).open(
         "r", encoding="utf-8"
     ) as f:

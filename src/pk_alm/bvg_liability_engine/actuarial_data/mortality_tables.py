@@ -1,9 +1,4 @@
-"""Mortality-table loaders.
-
-Currently delegates to the legacy :mod:`actuarial_assumptions.mortality`
-module. Once the refactor reaches Phase 7, the CSVs and primary loader will
-move into this package.
-"""
+"""Mortality-table loader exports for actuarial data."""
 
 from pk_alm.bvg_liability_engine.actuarial_assumptions.mortality import (
     DEFAULT_EK0105_TABLE_ID,

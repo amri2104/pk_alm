@@ -18,7 +18,7 @@ from pk_alm.actus_asset_engine.deterministic import (
     ASSET_SNAPSHOT_COLUMNS,
     validate_asset_dataframe,
 )
-from pk_alm.bvg_liability_engine.orchestration.engine import BVGEngineResult
+from pk_alm.bvg_liability_engine.orchestration import BVGEngineResult
 from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
 from pk_alm.bvg_liability_engine.pension_logic.valuation import validate_valuation_dataframe
 from pk_alm.cashflows.schema import validate_cashflow_dataframe

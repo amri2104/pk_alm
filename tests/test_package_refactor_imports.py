@@ -3,7 +3,7 @@
 
 def test_new_bvg_liability_engine_import_paths():
     from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort
-    from pk_alm.bvg_liability_engine.orchestration.engine import run_bvg_engine
+    from pk_alm.bvg_liability_engine.orchestration import run_bvg_engine
 
     assert ActiveCohort.__name__ == "ActiveCohort"
     assert callable(run_bvg_engine)

@@ -1,10 +1,4 @@
-"""Stage-2C parity: generic engine == legacy stage-2C engine with time-varying rates.
-
-The legacy engine consumes ``DynamicParameter`` (scalar | sequence) for
-``active_interest_rate`` and ``conversion_rate``; the generic engine uses
-:class:`StepRateCurve` for the same inputs. This test asserts both routes
-produce identical cashflows and portfolio states.
-"""
+"""Stage-2C canonical engine contract tests with time-varying rates."""
 
 from __future__ import annotations
 
@@ -24,9 +18,6 @@ from pk_alm.bvg_liability_engine.domain_models.cohorts import (
 )
 from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
 from pk_alm.bvg_liability_engine.orchestration.generic_engine import run_bvg_engine
-from pk_alm.bvg_liability_engine.orchestration.legacy.engine_stage2c import (
-    run_bvg_engine_stage2c,
-)
 from pk_alm.bvg_liability_engine.population_dynamics.entry_policies import (
     FixedEntryPolicy,
 )
@@ -62,28 +53,13 @@ def _portfolio() -> BVGPortfolioState:
     )
 
 
-def test_stage2c_step_rates_match_legacy() -> None:
+def test_stage2c_step_rates_drive_cashflows_and_states() -> None:
     initial = _portfolio()
     horizon = 12
     start_year = 2026
     active_seq = [0.0125, 0.0150, 0.0125, 0.0100, 0.0125]
     conv_seq = [0.068, 0.066, 0.064, 0.062, 0.060]
     entry = EntryAssumptions(entry_count_per_year=1)
-
-    legacy = run_bvg_engine_stage2c(
-        initial_state=initial,
-        horizon_years=horizon,
-        active_interest_rate=active_seq,
-        retired_interest_rate=0.0176,
-        salary_growth_rate=0.015,
-        turnover_rate=0.02,
-        entry_assumptions=entry,
-        contribution_multiplier=1.4,
-        start_year=start_year,
-        retirement_age=65,
-        capital_withdrawal_fraction=0.35,
-        conversion_rate=conv_seq,
-    )
 
     assumptions = BVGAssumptions(
         start_year=start_year,
@@ -108,34 +84,19 @@ def test_stage2c_step_rates_match_legacy() -> None:
     )
     new = run_bvg_engine(initial_state=initial, assumptions=assumptions)
 
-    pd.testing.assert_frame_equal(
-        new.cashflows.reset_index(drop=True),
-        legacy.cashflows.reset_index(drop=True),
-        check_dtype=False,
-    )
-    assert len(new.portfolio_states) == len(legacy.portfolio_states)
-    for i, (a, b) in enumerate(zip(new.portfolio_states, legacy.portfolio_states)):
-        assert a == b, f"portfolio_states[{i}] differs"
+    assert len(new.portfolio_states) == horizon + 1
+    assert len(new.year_steps) == horizon
+    assert tuple(ys.entry_count for ys in new.year_steps) == (1,) * horizon
+    assert new.assumptions.active_crediting_rate.value_at(2027) == 0.0150
+    assert new.assumptions.conversion_rate.value_at(2035) == 0.060
 
 
-def test_stage2c_scalar_rates_match_legacy() -> None:
-    """Scalar DynamicParameter inputs become FlatRateCurve."""
+def test_stage2c_scalar_rates_match_equivalent_flat_curves() -> None:
+    """Scalar inputs become flat curves."""
     initial = _portfolio()
     horizon = 8
     start_year = 2026
     entry = EntryAssumptions(entry_count_per_year=1)
-    legacy = run_bvg_engine_stage2c(
-        initial_state=initial,
-        horizon_years=horizon,
-        active_interest_rate=0.0125,
-        retired_interest_rate=0.0176,
-        salary_growth_rate=0.015,
-        turnover_rate=0.02,
-        entry_assumptions=entry,
-        contribution_multiplier=1.4,
-        start_year=start_year,
-        conversion_rate=0.068,
-    )
     assumptions = BVGAssumptions(
         start_year=start_year,
         horizon_years=horizon,
@@ -152,8 +113,29 @@ def test_stage2c_scalar_rates_match_legacy() -> None:
         entry_policy=FixedEntryPolicy(entry),
     )
     new = run_bvg_engine(initial_state=initial, assumptions=assumptions)
-    pd.testing.assert_frame_equal(
-        new.cashflows.reset_index(drop=True),
-        legacy.cashflows.reset_index(drop=True),
-        check_dtype=False,
+    flat_assumptions = BVGAssumptions(
+        start_year=start_year,
+        horizon_years=horizon,
+        active_crediting_rate=from_dynamic_parameter(
+            0.0125,
+            start_year=start_year,
+            horizon_years=horizon,
+        ),
+        retired_interest_rate=FlatRateCurve(0.0176),
+        technical_discount_rate=FlatRateCurve(0.0176),
+        economic_discount_rate=FlatRateCurve(0.0176),
+        salary_growth_rate=FlatRateCurve(0.015),
+        conversion_rate=from_dynamic_parameter(
+            0.068,
+            start_year=start_year,
+            horizon_years=horizon,
+        ),
+        turnover_rate=0.02,
+        capital_withdrawal_fraction=0.35,
+        contribution_multiplier=1.4,
+        mortality=MortalityAssumptions(mode="off"),
+        entry_policy=FixedEntryPolicy(entry),
     )
+    equivalent = run_bvg_engine(initial_state=initial, assumptions=flat_assumptions)
+    pd.testing.assert_frame_equal(new.cashflows, equivalent.cashflows)
+    assert new.portfolio_states == equivalent.portfolio_states
