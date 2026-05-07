@@ -37,6 +37,7 @@ from dataclasses import dataclass
 
 from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort
 from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
+from pk_alm.cashflows.event_types import EX as EX_EVENT_TYPE
 from pk_alm.cashflows.schema import CashflowRecord
 
 DEFAULT_TURNOVER_RATE: float = 0.02
@@ -44,9 +45,6 @@ DEFAULT_TURNOVER_RATE: float = 0.02
 
 MAX_PERMITTED_TURNOVER_RATE: float = 0.50
 """Hard upper bound to reject pathological scenarios. Configurable later."""
-
-EX_EVENT_TYPE: str = "EX"
-"""Stage-2 exit-cashflow type. Stage 1 uses PR / RP / KA only."""
 
 
 @dataclass(frozen=True)

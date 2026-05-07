@@ -1,0 +1,2 @@
+scenario_id,model_active,model_technical,n_paths,seed,model_active_params,model_technical_params,runtime_s
+stage2d_stochastic,hull_white,hull_white,50,42,"{""a"": 0.1, ""calibrator"": ""default_flat_curve_or_custom_calibrator"", ""r0"": 0.0176, ""sigma"": 0.001}","{""a"": 0.1, ""calibrator"": ""default_flat_curve_or_custom_calibrator"", ""r0"": 0.0176, ""sigma"": 0.005}",0.0

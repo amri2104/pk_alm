@@ -6,6 +6,7 @@ import numbers
 import pandas as pd
 
 from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
+from pk_alm.cashflows.event_types import PR, RP
 from pk_alm.cashflows.schema import (
     CashflowRecord,
     cashflow_records_to_dataframe,
@@ -71,7 +72,7 @@ def generate_bvg_cashflow_records_for_state(
             CashflowRecord(
                 contractId=cohort.cohort_id,
                 time=ts,
-                type="PR",
+                type=PR,
                 payoff=cohort.annual_age_credit_total * multiplier,
                 nominalValue=cohort.total_capital_active,
                 currency="CHF",
@@ -83,7 +84,7 @@ def generate_bvg_cashflow_records_for_state(
             CashflowRecord(
                 contractId=cohort.cohort_id,
                 time=ts,
-                type="RP",
+                type=RP,
                 payoff=-cohort.annual_pension_total,
                 nominalValue=cohort.total_capital_rente,
                 currency="CHF",

@@ -8,6 +8,7 @@ import pandas as pd
 
 from pk_alm.bvg_liability_engine.domain_models.cohorts import RetiredCohort
 from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
+from pk_alm.cashflows.event_types import KA
 from pk_alm.cashflows.schema import CashflowRecord
 
 
@@ -158,7 +159,7 @@ def apply_retirement_transitions_to_portfolio(
             CashflowRecord(
                 contractId=cohort.cohort_id,
                 time=ts,
-                type="KA",
+                type=KA,
                 payoff=-(cohort.count * withdrawal_pp),
                 nominalValue=cohort.count * retirement_capital_pp,
                 currency="CHF",

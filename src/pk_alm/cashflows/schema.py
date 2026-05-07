@@ -16,6 +16,8 @@ from dataclasses import dataclass
 
 import pandas as pd
 
+from pk_alm.cashflows.event_types import EXPECTED_PAYOFF_SIGNS
+
 CASHFLOW_COLUMNS = (
     "contractId",
     "time",
@@ -123,10 +125,16 @@ def cashflow_records_to_dataframe(records: list | tuple) -> pd.DataFrame:
     )
 
 
-def validate_cashflow_dataframe(df: pd.DataFrame) -> bool:
+def validate_cashflow_dataframe(
+    df: pd.DataFrame, *, check_event_type_signs: bool = False
+) -> bool:
     """Validate that df conforms to the shared cashflow schema.
 
     Returns True if all checks pass; otherwise raises ValueError or TypeError.
+
+    When ``check_event_type_signs`` is True, additionally enforce that each
+    row's ``payoff`` matches the expected sign for its ``type`` per
+    :data:`pk_alm.cashflows.event_types.EXPECTED_PAYOFF_SIGNS`.
     """
     if not isinstance(df, pd.DataFrame):
         raise TypeError(
@@ -178,5 +186,21 @@ def validate_cashflow_dataframe(df: pd.DataFrame) -> bool:
             raise ValueError(
                 f"{prefix}: source must be one of {VALID_SOURCES}, got {src!r}"
             )
+
+        if check_event_type_signs:
+            rule = EXPECTED_PAYOFF_SIGNS.get(typ)
+            if rule is None:
+                raise ValueError(
+                    f"{prefix}: unknown event type {typ!r} for sign check"
+                )
+            payoff = float(row["payoff"])
+            if rule == "non_negative" and payoff < 0:
+                raise ValueError(
+                    f"{prefix}: type {typ!r} requires non-negative payoff, got {payoff}"
+                )
+            if rule == "non_positive" and payoff > 0:
+                raise ValueError(
+                    f"{prefix}: type {typ!r} requires non-positive payoff, got {payoff}"
+                )
 
     return True

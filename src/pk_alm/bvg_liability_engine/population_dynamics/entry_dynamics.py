@@ -37,6 +37,7 @@ from dataclasses import dataclass
 
 from pk_alm.bvg_liability_engine.domain_models.cohorts import ActiveCohort
 from pk_alm.bvg_liability_engine.domain_models.portfolio import BVGPortfolioState
+from pk_alm.cashflows.event_types import IN as IN_EVENT_TYPE
 from pk_alm.cashflows.schema import CashflowRecord
 
 DEFAULT_ENTRY_AGE: int = 25
@@ -44,9 +45,6 @@ DEFAULT_ENTRY_COUNT_PER_YEAR: int = 1
 DEFAULT_ENTRY_GROSS_SALARY: float = 65_000.0
 DEFAULT_ENTRY_CAPITAL_PER_PERSON: float = 0.0
 DEFAULT_ENTRY_COHORT_ID_PREFIX: str = "ENTRY"
-
-IN_EVENT_TYPE: str = "IN"
-"""Stage-2 incoming-Freizügigkeitsleistung cashflow type."""
 
 
 @dataclass(frozen=True)
