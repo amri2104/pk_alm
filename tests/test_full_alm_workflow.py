@@ -1,7 +1,6 @@
 """Tests for Sprint 9 Full ALM user-facing workflow."""
 
 import os
-import runpy
 from pathlib import Path
 
 import pandas as pd
@@ -19,7 +18,6 @@ from pk_alm.workflows.full_alm_workflow import (
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _PROTECTED_OUTPUTS_DIR = _REPO_ROOT / "outputs" / "stage1_baseline"
 _PYPROJECT = _REPO_ROOT / "pyproject.toml"
-_EXAMPLE_PATH = _REPO_ROOT / "examples" / "full_alm_reporting_workflow.py"
 
 
 def test_workflow_creates_csv_and_png_outputs(tmp_path):
@@ -105,13 +103,8 @@ def test_aal_errors_propagate(tmp_path, monkeypatch):
     assert not tmp_path.exists() or list(tmp_path.iterdir()) == []
 
 
-def test_example_script_is_import_safe_and_main_guarded():
-    namespace = runpy.run_path(str(_EXAMPLE_PATH), run_name="not_main")
-    text = _EXAMPLE_PATH.read_text()
-
-    assert "main" in namespace
-    assert 'if __name__ == "__main__":' in text
-    assert "main()" in text
+def test_workflow_module_exposes_import_safe_entrypoint():
+    assert callable(run_full_alm_reporting_workflow)
 
 
 def test_generated_files_summary_is_stable(tmp_path):

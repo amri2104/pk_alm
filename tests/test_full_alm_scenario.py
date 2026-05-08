@@ -108,6 +108,30 @@ def test_full_alm_scenario_runs_with_required_aal_path(fake_aal_engine):
     assert result.aal_asset_result.generation_mode == "aal"
 
 
+def test_analytics_result_alias_points_to_canonical_analytics(fake_aal_engine):
+    result = run_full_alm_scenario()
+    assert result.analytics_result is result.alm_analytics_result
+
+
+def test_new_optional_assumption_parameters_preserve_defaults(fake_aal_engine):
+    implicit = run_full_alm_scenario()
+    explicit = run_full_alm_scenario(
+        conversion_rate=0.068,
+        capital_withdrawal_fraction=0.35,
+        turnover_rate=0.0,
+        salary_growth_rate=0.0,
+    )
+
+    pd.testing.assert_frame_equal(
+        implicit.stage1_result.engine_result.cashflows,
+        explicit.stage1_result.engine_result.cashflows,
+    )
+    pd.testing.assert_frame_equal(
+        implicit.analytics_result.funding_ratio_trajectory,
+        explicit.analytics_result.funding_ratio_trajectory,
+    )
+
+
 def test_asset_contracts_are_passed_to_aal_engine(fake_aal_engine):
     contracts = (
         make_pam_contract_config(

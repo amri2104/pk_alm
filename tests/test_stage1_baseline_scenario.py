@@ -1,4 +1,5 @@
 from pathlib import Path
+import runpy
 
 import pandas as pd
 import pytest
@@ -32,8 +33,12 @@ from pk_alm.scenarios.result_summary import (
     validate_scenario_result_dataframe,
 )
 
-EXAMPLE_PATH = (
-    Path(__file__).resolve().parent.parent / "examples" / "stage1_baseline.py"
+MODULE_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "src"
+    / "pk_alm"
+    / "scenarios"
+    / "stage1_baseline.py"
 )
 
 
@@ -444,23 +449,18 @@ def test_construct_with_non_path_value_in_output_paths_raises():
 
 
 # ---------------------------------------------------------------------------
-# H. Example script exists and is import-safe
+# H. Scenario module exists and is import-safe
 # ---------------------------------------------------------------------------
 
 
-def test_example_script_exists_and_is_main_guarded():
-    assert EXAMPLE_PATH.exists()
-    text = EXAMPLE_PATH.read_text()
-    assert 'if __name__ == "__main__":' in text
+def test_stage1_scenario_module_exists():
+    assert MODULE_PATH.exists()
 
 
-def test_example_script_does_not_run_on_import_via_text_inspection(tmp_path):
-    # We never execute the example as __main__. Reading the source should
-    # never produce side-effect files in cwd. Verify outputs/stage1_baseline
-    # was not created merely by reading the file.
-    text = EXAMPLE_PATH.read_text()
-    assert "run_stage1_baseline" in text
-    # No file should be written to tmp_path just from reading the source.
+def test_stage1_scenario_module_does_not_run_on_import(tmp_path):
+    namespace = runpy.run_path(str(MODULE_PATH), run_name="not_main")
+
+    assert "run_stage1_baseline" in namespace
     assert list(tmp_path.iterdir()) == []
 
 

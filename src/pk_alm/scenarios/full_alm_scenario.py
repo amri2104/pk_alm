@@ -57,6 +57,7 @@ from pk_alm.scenarios.stage1_baseline import (
     build_default_stage1_portfolio,
 )
 
+
 @dataclass(frozen=True)
 class FullALMScenarioResult:
     """Result container for one Full ALM scenario run."""
@@ -121,6 +122,10 @@ class FullALMScenarioResult:
     def kpi_summary(self) -> pd.DataFrame:
         return self.alm_analytics_result.kpi_summary
 
+    @property
+    def analytics_result(self) -> ALMAnalyticsResult:
+        return self.alm_analytics_result
+
 
 def run_full_alm_scenario(
     *,
@@ -134,6 +139,10 @@ def run_full_alm_scenario(
     valuation_terminal_age: int = 90,
     target_funding_ratio: float = 1.076,
     annual_asset_return: float = 0.0,
+    conversion_rate: float = 0.068,
+    capital_withdrawal_fraction: float = 0.35,
+    turnover_rate: float = 0.0,
+    salary_growth_rate: float = 0.0,
     asset_contracts: tuple[AALContractConfig, ...] | list[AALContractConfig] | None = None,
 ) -> FullALMScenarioResult:
     """Run the BVG liability engine and the AAL Asset Engine and combine results.
@@ -151,10 +160,10 @@ def run_full_alm_scenario(
         retired_interest_rate=FlatRateCurve(retired_interest_rate),
         technical_discount_rate=FlatRateCurve(technical_interest_rate),
         economic_discount_rate=FlatRateCurve(technical_interest_rate),
-        salary_growth_rate=FlatRateCurve(0.0),
-        conversion_rate=FlatRateCurve(0.068),
-        turnover_rate=0.0,
-        capital_withdrawal_fraction=0.35,
+        salary_growth_rate=FlatRateCurve(salary_growth_rate),
+        conversion_rate=FlatRateCurve(conversion_rate),
+        turnover_rate=turnover_rate,
+        capital_withdrawal_fraction=capital_withdrawal_fraction,
         contribution_multiplier=contribution_multiplier,
         mortality=MortalityAssumptions(mode="off"),
         entry_policy=NoEntryPolicy(),
