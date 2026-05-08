@@ -1,283 +1,145 @@
-"""AAL/ACTUS asset portfolio specs and construction helpers.
-
-Phase 2 asset modelling uses explicit spec classes for PAM bonds, STK
-positions, and CSH cash positions. PAM, STK, and CSH contracts are sent to
-the live AAL server. The engine records only server-emitted asset cashflows:
-PAM emits IP/MD, STK currently emits TD but no DV on the tested public AAL
-reference server, and CSH currently emits no temporal events.
-"""
+"""Default ACTUS-native asset portfolio configs for AAL modelling."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
-import numbers
-from types import ModuleType
-from typing import Any, TypeAlias
 
-from pk_alm.actus_asset_engine.aal_asset_boundary import (
-    build_aal_cash_contract,
-    build_aal_pam_contract,
-    build_aal_portfolio,
-    build_aal_stk_contract,
+from pk_alm.actus_asset_engine.contract_config import (
+    AALContractConfig,
+    build_aal_contract,
+    build_aal_contracts,
+    build_aal_portfolio_from_configs,
+    validate_aal_contract_configs,
 )
 
 
-def _validate_non_empty_string(value: object, name: str) -> str:
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{name} must be a non-empty string")
+def _iso(year: int, month: int = 1, day: int = 1) -> str:
+    return f"{year:04d}-{month:02d}-{day:02d}T00:00:00"
+
+
+def _validate_year(value: object, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"{name} must be int, got {type(value).__name__}")
     return value
 
 
-def _validate_currency(value: object, name: str = "currency") -> str:
-    currency = _validate_non_empty_string(value, name)
-    if len(currency) != 3 or not currency.isalpha() or currency.upper() != currency:
-        raise ValueError(f"{name} must be a 3-letter uppercase ISO-4217 code")
-    return currency
-
-
-def _validate_non_bool_int(value: object, name: str) -> int:
-    if isinstance(value, bool):
-        raise TypeError(f"{name} must not be bool")
-    if not isinstance(value, numbers.Integral):
-        raise TypeError(f"{name} must be int, got {type(value).__name__}")
-    return int(value)
-
-
-def _validate_non_bool_real(
-    value: object,
-    name: str,
-    *,
-    min_value: float,
-    allow_equal_min: bool,
-) -> float:
-    if isinstance(value, bool):
-        raise TypeError(f"{name} must not be bool")
-    if not isinstance(value, numbers.Real):
+def _validate_positive_number(value: object, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise TypeError(f"{name} must be numeric, got {type(value).__name__}")
     result = float(value)
-    if math.isnan(result):
-        raise ValueError(f"{name} must not be NaN")
-    if allow_equal_min:
-        if result < min_value:
-            raise ValueError(f"{name} must be >= {min_value}, got {result}")
-    else:
-        if result <= min_value:
-            raise ValueError(f"{name} must be > {min_value}, got {result}")
+    if math.isnan(result) or result <= 0.0:
+        raise ValueError(f"{name} must be > 0")
     return result
 
 
-def _derive_stk_terminal_price(
+def _validate_non_negative_number(value: object, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError(f"{name} must be numeric, got {type(value).__name__}")
+    result = float(value)
+    if math.isnan(result) or result < 0.0:
+        raise ValueError(f"{name} must be >= 0")
+    return result
+
+
+def make_pam_contract_config(
     *,
+    contract_id: str,
+    start_year: int,
+    maturity_year: int,
+    nominal_value: float,
+    coupon_rate: float,
+    coupon_cycle: str = "P1YL1",
+    coupon_anchor_date: str | None = None,
+    currency: str = "CHF",
+    label: str | None = None,
+) -> AALContractConfig:
+    """Build an ACTUS PAM config for a fixed-rate bond."""
+    start = _validate_year(start_year, "start_year")
+    maturity = _validate_year(maturity_year, "maturity_year")
+    if maturity <= start:
+        raise ValueError("maturity_year must be > start_year")
+    nominal = _validate_positive_number(nominal_value, "nominal_value")
+    coupon = _validate_non_negative_number(coupon_rate, "coupon_rate")
+    anchor = coupon_anchor_date or _iso(start + 1)
+    return AALContractConfig(
+        contract_type="PAM",
+        label=label,
+        terms={
+            "contractDealDate": _iso(start),
+            "contractID": contract_id,
+            "contractRole": "RPA",
+            "counterpartyID": "COUNTERPARTY_1",
+            "creatorID": "PK_ALM",
+            "currency": currency,
+            "dayCountConvention": "30E360",
+            "initialExchangeDate": _iso(start),
+            "maturityDate": _iso(maturity, 12, 31),
+            "nominalInterestRate": coupon,
+            "notionalPrincipal": nominal,
+            "statusDate": _iso(start),
+            "cycleAnchorDateOfInterestPayment": anchor,
+            "cycleOfInterestPayment": coupon_cycle,
+        },
+    )
+
+
+def make_stk_contract_config(
+    *,
+    contract_id: str,
     start_year: int,
     divestment_year: int,
+    quantity: float,
     price_at_purchase: float,
-    market_value_growth: float,
-) -> float:
-    years = divestment_year - start_year
-    return price_at_purchase * ((1.0 + market_value_growth) ** years)
-
-
-class AALAssetContractSpec:
-    """Compatibility base class for Phase 2 asset specs.
-
-    The concrete, instantiable specs are ``PAMSpec``, ``STKSpec``, and
-    ``CSHSpec``. This base exists so untouched integration code that imports
-    ``AALAssetContractSpec`` can continue to type-check and use
-    ``isinstance(..., AALAssetContractSpec)`` until the engine refactor.
-    """
-
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        if type(self) is AALAssetContractSpec:
-            raise TypeError(
-                "AALAssetContractSpec is a compatibility base; "
-                "instantiate PAMSpec, STKSpec, or CSHSpec"
-            )
-        super().__init__()
-
-
-@dataclass(frozen=True)
-class PAMSpec(AALAssetContractSpec):
-    """Specification for one PAM bond contract."""
-
-    contract_id: str
-    start_year: int
-    maturity_year: int
-    nominal_value: float
-    coupon_rate: float
-    coupon_cycle: str = "P1YL1"
-    coupon_anchor_date: str | None = None
-    currency: str = "CHF"
-
-    @property
-    def contract_type(self) -> str:
-        return "PAM"
-
-    def __post_init__(self) -> None:
-        contract_id = _validate_non_empty_string(self.contract_id, "contract_id")
-        start_year = _validate_non_bool_int(self.start_year, "start_year")
-        maturity_year = _validate_non_bool_int(self.maturity_year, "maturity_year")
-        if maturity_year <= start_year:
-            raise ValueError(
-                "maturity_year must be > start_year "
-                f"({maturity_year} <= {start_year})"
-            )
-        nominal_value = _validate_non_bool_real(
-            self.nominal_value,
-            "nominal_value",
-            min_value=0.0,
-            allow_equal_min=False,
+    price_at_termination: float,
+    dividend_yield: float = 0.0,
+    currency: str = "CHF",
+    label: str | None = None,
+) -> AALContractConfig:
+    """Build an ACTUS STK config for a listed-equity-style proxy."""
+    start = _validate_year(start_year, "start_year")
+    divestment = _validate_year(divestment_year, "divestment_year")
+    if divestment <= start:
+        raise ValueError("divestment_year must be > start_year")
+    quantity = _validate_positive_number(quantity, "quantity")
+    purchase_price = _validate_positive_number(
+        price_at_purchase, "price_at_purchase"
+    )
+    termination_price = _validate_positive_number(
+        price_at_termination, "price_at_termination"
+    )
+    dividend = _validate_non_negative_number(dividend_yield, "dividend_yield")
+    nominal = quantity * purchase_price
+    terms: dict[str, object] = {
+        "contractDealDate": _iso(start),
+        "contractID": contract_id,
+        "contractRole": "RPA",
+        "counterpartyID": "COUNTERPARTY_1",
+        "creatorID": "PK_ALM",
+        "currency": currency,
+        "notionalPrincipal": nominal,
+        "priceAtPurchaseDate": purchase_price,
+        "purchaseDate": _iso(start),
+        "quantity": quantity,
+        "statusDate": _iso(start),
+        "terminationDate": _iso(divestment, 12, 31),
+        "priceAtTerminationDate": termination_price,
+    }
+    if dividend > 0.0:
+        terms.update(
+            {
+                "cycleOfDividend": "P1YL1",
+                "cycleAnchorDateOfDividend": _iso(start + 1),
+                "nextDividendPaymentAmount": dividend * nominal,
+            }
         )
-        coupon_rate = _validate_non_bool_real(
-            self.coupon_rate,
-            "coupon_rate",
-            min_value=0.0,
-            allow_equal_min=True,
-        )
-        coupon_cycle = _validate_non_empty_string(
-            self.coupon_cycle, "coupon_cycle"
-        )
-        coupon_anchor_date = self.coupon_anchor_date
-        if coupon_anchor_date is not None:
-            coupon_anchor_date = _validate_non_empty_string(
-                coupon_anchor_date, "coupon_anchor_date"
-            )
-        currency = _validate_currency(self.currency)
-
-        object.__setattr__(self, "contract_id", contract_id)
-        object.__setattr__(self, "start_year", start_year)
-        object.__setattr__(self, "maturity_year", maturity_year)
-        object.__setattr__(self, "nominal_value", nominal_value)
-        object.__setattr__(self, "coupon_rate", coupon_rate)
-        object.__setattr__(self, "coupon_cycle", coupon_cycle)
-        object.__setattr__(self, "coupon_anchor_date", coupon_anchor_date)
-        object.__setattr__(self, "currency", currency)
+    return AALContractConfig(
+        contract_type="STK",
+        terms=terms,
+        label=label,
+    )
 
 
-@dataclass(frozen=True)
-class STKSpec(AALAssetContractSpec):
-    """Specification for one STK position.
-
-    ``dividend_yield`` declares dividend intent in the AAL Group 1 terms when
-    positive. The tested public AAL reference server does not emit DV events,
-    and the Python engine does not synthesize dividends.
-
-    ``market_value_growth`` is used to derive ``price_at_termination`` for the
-    ACTUS TD event and to value the open STK position in asset snapshots. It
-    does not generate Python-side cashflow events.
-    """
-
-    contract_id: str
-    start_year: int
-    divestment_year: int
-    quantity: float
-    price_at_purchase: float
-    price_at_termination: float
-    currency: str = "CHF"
-    dividend_yield: float = 0.0
-    market_value_growth: float = 0.0
-
-    @property
-    def contract_type(self) -> str:
-        return "STK"
-
-    @property
-    def nominal_value(self) -> float:
-        return self.quantity * self.price_at_purchase
-
-    def __post_init__(self) -> None:
-        contract_id = _validate_non_empty_string(self.contract_id, "contract_id")
-        start_year = _validate_non_bool_int(self.start_year, "start_year")
-        divestment_year = _validate_non_bool_int(
-            self.divestment_year, "divestment_year"
-        )
-        if divestment_year <= start_year:
-            raise ValueError(
-                "divestment_year must be > start_year "
-                f"({divestment_year} <= {start_year})"
-            )
-        quantity = _validate_non_bool_real(
-            self.quantity,
-            "quantity",
-            min_value=0.0,
-            allow_equal_min=False,
-        )
-        price_at_purchase = _validate_non_bool_real(
-            self.price_at_purchase,
-            "price_at_purchase",
-            min_value=0.0,
-            allow_equal_min=False,
-        )
-        price_at_termination = _validate_non_bool_real(
-            self.price_at_termination,
-            "price_at_termination",
-            min_value=0.0,
-            allow_equal_min=False,
-        )
-        dividend_yield = _validate_non_bool_real(
-            self.dividend_yield,
-            "dividend_yield",
-            min_value=0.0,
-            allow_equal_min=True,
-        )
-        market_value_growth = _validate_non_bool_real(
-            self.market_value_growth,
-            "market_value_growth",
-            min_value=-1.0,
-            allow_equal_min=False,
-        )
-        currency = _validate_currency(self.currency)
-
-        object.__setattr__(self, "contract_id", contract_id)
-        object.__setattr__(self, "start_year", start_year)
-        object.__setattr__(self, "divestment_year", divestment_year)
-        object.__setattr__(self, "quantity", quantity)
-        object.__setattr__(self, "price_at_purchase", price_at_purchase)
-        object.__setattr__(self, "price_at_termination", price_at_termination)
-        object.__setattr__(self, "currency", currency)
-        object.__setattr__(self, "dividend_yield", dividend_yield)
-        object.__setattr__(self, "market_value_growth", market_value_growth)
-
-
-@dataclass(frozen=True)
-class CSHSpec(AALAssetContractSpec):
-    """Specification for one CSH cash position.
-
-    CSH is sent to the live AAL Portfolio for completeness. The tested public
-    AAL reference server emits no temporal CSH events, and the Python engine
-    does not synthesize cash interest.
-    """
-
-    contract_id: str
-    start_year: int
-    nominal_value: float
-    currency: str = "CHF"
-
-    @property
-    def contract_type(self) -> str:
-        return "CSH"
-
-    def __post_init__(self) -> None:
-        contract_id = _validate_non_empty_string(self.contract_id, "contract_id")
-        start_year = _validate_non_bool_int(self.start_year, "start_year")
-        nominal_value = _validate_non_bool_real(
-            self.nominal_value,
-            "nominal_value",
-            min_value=0.0,
-            allow_equal_min=False,
-        )
-        currency = _validate_currency(self.currency)
-
-        object.__setattr__(self, "contract_id", contract_id)
-        object.__setattr__(self, "start_year", start_year)
-        object.__setattr__(self, "nominal_value", nominal_value)
-        object.__setattr__(self, "currency", currency)
-
-
-AssetSpec: TypeAlias = PAMSpec | STKSpec | CSHSpec
-
-
-def _stk_spec_from_nominal(
+def make_stk_contract_config_from_nominal(
     *,
     contract_id: str,
     start_year: int,
@@ -287,197 +149,152 @@ def _stk_spec_from_nominal(
     market_value_growth: float,
     price_at_purchase: float = 100.0,
     currency: str = "CHF",
-) -> STKSpec:
-    quantity = nominal_value / price_at_purchase
-    price_at_termination = _derive_stk_terminal_price(
-        start_year=start_year,
-        divestment_year=divestment_year,
-        price_at_purchase=price_at_purchase,
-        market_value_growth=market_value_growth,
+    label: str | None = None,
+) -> AALContractConfig:
+    nominal = _validate_positive_number(nominal_value, "nominal_value")
+    purchase_price = _validate_positive_number(
+        price_at_purchase, "price_at_purchase"
     )
-    return STKSpec(
+    if isinstance(market_value_growth, bool) or not isinstance(
+        market_value_growth, (int, float)
+    ):
+        raise TypeError("market_value_growth must be numeric")
+    growth = float(market_value_growth)
+    if math.isnan(growth) or growth <= -1.0:
+        raise ValueError("market_value_growth must be > -1")
+    years = _validate_year(divestment_year, "divestment_year") - _validate_year(
+        start_year, "start_year"
+    )
+    return make_stk_contract_config(
         contract_id=contract_id,
         start_year=start_year,
         divestment_year=divestment_year,
-        quantity=quantity,
-        price_at_purchase=price_at_purchase,
-        price_at_termination=price_at_termination,
-        currency=currency,
+        quantity=nominal / purchase_price,
+        price_at_purchase=purchase_price,
+        price_at_termination=purchase_price * ((1.0 + growth) ** years),
         dividend_yield=dividend_yield,
-        market_value_growth=market_value_growth,
+        currency=currency,
+        label=label,
     )
 
 
-DEFAULT_AAL_ASSET_CONTRACT_SPECS: tuple[AssetSpec, ...] = (
-    PAMSpec(
+def make_csh_contract_config(
+    *,
+    contract_id: str,
+    start_year: int,
+    nominal_value: float,
+    currency: str = "CHF",
+    label: str | None = None,
+) -> AALContractConfig:
+    """Build an ACTUS CSH config for a cash position."""
+    start = _validate_year(start_year, "start_year")
+    nominal = _validate_positive_number(nominal_value, "nominal_value")
+    return AALContractConfig(
+        contract_type="CSH",
+        label=label,
+        terms={
+            "contractID": contract_id,
+            "contractRole": "RPA",
+            "creatorID": "PK_ALM",
+            "currency": currency,
+            "notionalPrincipal": nominal,
+            "statusDate": _iso(start),
+        },
+    )
+
+
+DEFAULT_AAL_ASSET_CONTRACT_CONFIGS: tuple[AALContractConfig, ...] = (
+    make_pam_contract_config(
         contract_id="AAL_PAM_BOND_2Y",
         start_year=2026,
         maturity_year=2028,
         nominal_value=310_000.0,
         coupon_rate=0.012,
+        label="BVG bond bucket 2Y",
     ),
-    PAMSpec(
+    make_pam_contract_config(
         contract_id="AAL_PAM_BOND_5Y",
         start_year=2026,
         maturity_year=2031,
         nominal_value=310_000.0,
         coupon_rate=0.014,
+        label="BVG bond bucket 5Y",
     ),
-    PAMSpec(
+    make_pam_contract_config(
         contract_id="AAL_PAM_BOND_7Y",
         start_year=2026,
         maturity_year=2033,
         nominal_value=310_000.0,
         coupon_rate=0.015,
+        label="BVG bond bucket 7Y",
     ),
-    PAMSpec(
+    make_pam_contract_config(
         contract_id="AAL_PAM_BOND_10Y",
         start_year=2026,
         maturity_year=2036,
         nominal_value=310_000.0,
         coupon_rate=0.017,
+        label="BVG bond bucket 10Y",
     ),
-    PAMSpec(
+    make_pam_contract_config(
         contract_id="AAL_PAM_BOND_15Y",
         start_year=2026,
         maturity_year=2041,
         nominal_value=310_000.0,
         coupon_rate=0.018,
+        label="BVG bond bucket 15Y",
     ),
-    _stk_spec_from_nominal(
+    make_stk_contract_config_from_nominal(
         contract_id="AAL_STK_EQUITY_PROXY",
         start_year=2026,
         divestment_year=2038,
         nominal_value=1_550_000.0,
         dividend_yield=0.025,
         market_value_growth=0.040,
+        label="Equity proxy",
     ),
-    _stk_spec_from_nominal(
+    make_stk_contract_config_from_nominal(
         contract_id="AAL_STK_REAL_ESTATE_PROXY",
         start_year=2026,
         divestment_year=2038,
         nominal_value=1_150_000.0,
         dividend_yield=0.035,
         market_value_growth=0.020,
+        label="Real estate proxy",
     ),
-    CSHSpec(
+    make_csh_contract_config(
         contract_id="AAL_CSH_CASH",
         start_year=2026,
         nominal_value=250_000.0,
+        label="Cash",
     ),
-    _stk_spec_from_nominal(
+    make_stk_contract_config_from_nominal(
         contract_id="AAL_STK_ALTERNATIVES_PROXY",
         start_year=2026,
         divestment_year=2038,
         nominal_value=500_000.0,
         dividend_yield=0.0,
         market_value_growth=0.030,
+        label="Alternatives proxy",
     ),
 )
 
 
-def get_default_aal_asset_contract_specs() -> tuple[AssetSpec, ...]:
-    """Return the default Phase 2 pension-fund asset portfolio specs."""
-    return DEFAULT_AAL_ASSET_CONTRACT_SPECS
+def get_default_aal_asset_contract_configs() -> tuple[AALContractConfig, ...]:
+    """Return the default ACTUS-native pension-fund asset portfolio."""
+    return DEFAULT_AAL_ASSET_CONTRACT_CONFIGS
 
 
-def validate_aal_asset_contract_specs(
-    specs: tuple[AssetSpec, ...] | list[AssetSpec],
-) -> tuple[AssetSpec, ...]:
-    """Validate portfolio-level constraints for AAL asset contract specs."""
-    if not isinstance(specs, (list, tuple)):
-        raise TypeError(f"specs must be list or tuple, got {type(specs).__name__}")
-    if not specs:
-        raise ValueError("specs must not be empty")
-
-    validated: list[AssetSpec] = []
-    for i, spec in enumerate(specs):
-        if not isinstance(spec, (PAMSpec, STKSpec, CSHSpec)):
-            raise TypeError(
-                f"specs[{i}] must be PAMSpec, STKSpec, or CSHSpec, "
-                f"got {type(spec).__name__}"
-            )
-        validated.append(spec)
-
-    contract_ids = [spec.contract_id for spec in validated]
-    duplicates = sorted({cid for cid in contract_ids if contract_ids.count(cid) > 1})
-    if duplicates:
-        raise ValueError(f"duplicate contract_id values: {duplicates}")
-
-    currencies = {spec.currency for spec in validated}
-    if len(currencies) != 1:
-        raise ValueError(
-            "mixed currencies are not supported for Stage-1 portfolio analytics"
-        )
-
-    return tuple(validated)
-
-
-def _resolve_specs(
-    specs: tuple[AssetSpec, ...] | list[AssetSpec] | None,
-) -> tuple[AssetSpec, ...]:
-    if specs is None:
-        return validate_aal_asset_contract_specs(get_default_aal_asset_contract_specs())
-    return validate_aal_asset_contract_specs(specs)
-
-
-def build_aal_pam_contracts_from_specs(
-    module: ModuleType | Any,
-    specs: tuple[AssetSpec, ...] | list[AssetSpec] | None = None,
-) -> tuple[object, ...]:
-    """Construct AAL PAM contracts from the PAM subset of portfolio specs."""
-    resolved = _resolve_specs(specs)
-    return tuple(
-        build_aal_pam_contract(
-            module,
-            contract_id=spec.contract_id,
-            start_year=spec.start_year,
-            maturity_year=spec.maturity_year,
-            nominal_value=spec.nominal_value,
-            coupon_rate=spec.coupon_rate,
-            coupon_cycle=spec.coupon_cycle,
-            coupon_anchor_date=spec.coupon_anchor_date,
-            currency=spec.currency,
-        )
-        for spec in resolved
-        if isinstance(spec, PAMSpec)
-    )
-
-
-def build_aal_stk_contracts_from_specs(
-    module: ModuleType | Any,
-    specs: tuple[AssetSpec, ...] | list[AssetSpec] | None = None,
-) -> tuple[object, ...]:
-    """Construct AAL STK contracts from the STK subset of portfolio specs."""
-    resolved = _resolve_specs(specs)
-    return tuple(
-        build_aal_stk_contract(module, spec)
-        for spec in resolved
-        if isinstance(spec, STKSpec)
-    )
-
-
-def build_aal_cash_contracts_from_specs(
-    module: ModuleType | Any,
-    specs: tuple[AssetSpec, ...] | list[AssetSpec] | None = None,
-) -> tuple[object, ...]:
-    """Construct AAL CSH contracts from the CSH subset of portfolio specs."""
-    resolved = _resolve_specs(specs)
-    return tuple(
-        build_aal_cash_contract(module, spec)
-        for spec in resolved
-        if isinstance(spec, CSHSpec)
-    )
-
-
-def build_aal_portfolio_from_specs(
-    module: ModuleType | Any,
-    specs: tuple[AssetSpec, ...] | list[AssetSpec] | None = None,
-) -> object:
-    """Construct an AAL Portfolio from PAM, STK, and CSH portfolio specs."""
-    contracts = [
-        *build_aal_pam_contracts_from_specs(module, specs),
-        *build_aal_stk_contracts_from_specs(module, specs),
-        *build_aal_cash_contracts_from_specs(module, specs),
-    ]
-    return build_aal_portfolio(module, contracts)
+__all__ = [
+    "AALContractConfig",
+    "DEFAULT_AAL_ASSET_CONTRACT_CONFIGS",
+    "build_aal_contract",
+    "build_aal_contracts",
+    "build_aal_portfolio_from_configs",
+    "get_default_aal_asset_contract_configs",
+    "make_csh_contract_config",
+    "make_pam_contract_config",
+    "make_stk_contract_config",
+    "make_stk_contract_config_from_nominal",
+    "validate_aal_contract_configs",
+]

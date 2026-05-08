@@ -1,9 +1,4 @@
-"""Asset-side year-end trajectory for live AAL server cashflows.
-
-The trajectory uses only real AAL/ACTUS server events as cashflows. STK market
-values are still valued from the scenario assumption while open, but missing
-STK dividends and CSH interest are not synthesized as cashflows.
-"""
+"""Asset-side year-end trajectory for ACTUS-native AAL contract configs."""
 
 from __future__ import annotations
 
@@ -12,12 +7,9 @@ import numbers
 
 import pandas as pd
 
-from pk_alm.actus_asset_engine.aal_asset_portfolio import (
-    AssetSpec,
-    CSHSpec,
-    PAMSpec,
-    STKSpec,
-    validate_aal_asset_contract_specs,
+from pk_alm.actus_asset_engine.contract_config import (
+    AALContractConfig,
+    validate_aal_contract_configs,
 )
 from pk_alm.cashflows.schema import validate_cashflow_dataframe
 
@@ -55,6 +47,21 @@ def _validate_non_bool_real(value: object, name: str) -> float:
     return result
 
 
+def _term_float(config: AALContractConfig, key: str, default: float = 0.0) -> float:
+    value = config.terms.get(key, default)
+    if isinstance(value, bool) or not isinstance(value, numbers.Real):
+        return default
+    result = float(value)
+    return default if math.isnan(result) else result
+
+
+def _term_year(config: AALContractConfig, key: str, default: int) -> int:
+    timestamp = config.term_timestamp(key)
+    if timestamp is None:
+        return default
+    return int(timestamp.year)
+
+
 def _cashflow_total(
     cashflows: pd.DataFrame,
     *,
@@ -71,38 +78,68 @@ def _cashflow_total(
     return float(cashflows.loc[mask, "payoff"].sum())
 
 
-def _pam_value(pam_specs: tuple[PAMSpec, ...], *, year: int) -> float:
-    return float(
-        sum(spec.nominal_value for spec in pam_specs if year < spec.maturity_year)
-    )
-
-
-def _stk_market_value(stk_specs: tuple[STKSpec, ...], *, year: int) -> float:
+def _pam_value(contracts: tuple[AALContractConfig, ...], *, year: int) -> float:
     total = 0.0
-    for spec in stk_specs:
-        if year < spec.start_year or year >= spec.divestment_year:
+    for config in contracts:
+        if config.contract_type != "PAM":
             continue
-        elapsed_years = year - spec.start_year
-        total += (
-            spec.quantity
-            * spec.price_at_purchase
-            * ((1.0 + spec.market_value_growth) ** elapsed_years)
-        )
+        maturity_year = _term_year(config, "maturityDate", default=year)
+        if year < maturity_year:
+            total += _term_float(config, "notionalPrincipal")
     return float(total)
 
 
+def _stk_market_value(
+    contracts: tuple[AALContractConfig, ...],
+    *,
+    year: int,
+) -> float:
+    total = 0.0
+    for config in contracts:
+        if config.contract_type != "STK":
+            continue
+        purchase_year = _term_year(
+            config,
+            "purchaseDate",
+            default=int(config.status_date.year),
+        )
+        termination_year = _term_year(config, "terminationDate", default=year)
+        if year < purchase_year or year >= termination_year:
+            continue
+        quantity = _term_float(config, "quantity")
+        purchase_price = _term_float(config, "priceAtPurchaseDate")
+        termination_price = _term_float(
+            config,
+            "priceAtTerminationDate",
+            default=purchase_price,
+        )
+        years_total = max(termination_year - purchase_year, 1)
+        elapsed_years = max(year - purchase_year, 0)
+        growth = (termination_price / purchase_price) ** (
+            elapsed_years / years_total
+        )
+        total += quantity * purchase_price * growth
+    return float(total)
+
+
+def _csh_value(contracts: tuple[AALContractConfig, ...]) -> float:
+    return float(
+        sum(
+            _term_float(config, "notionalPrincipal")
+            for config in contracts
+            if config.contract_type == "CSH"
+        )
+    )
+
+
 def compute_actus_asset_trajectory(
-    specs: tuple[AssetSpec, ...] | list[AssetSpec],
+    contracts: tuple[AALContractConfig, ...] | list[AALContractConfig],
     cashflows: pd.DataFrame,
     horizon_years: int,
     initial_cash: float = 0.0,
 ) -> pd.DataFrame:
-    """Compute asset-side year-end snapshots from specs and asset cashflows.
-
-    This helper is asset-side only. It does not include BVG net cashflows;
-    scenario runners combine BVG and asset cashflows in a later layer.
-    """
-    resolved_specs = validate_aal_asset_contract_specs(specs)
+    """Compute year-end asset snapshots from ACTUS configs and cashflows."""
+    resolved_contracts = validate_aal_contract_configs(contracts)
     if not isinstance(cashflows, pd.DataFrame):
         raise TypeError(
             f"cashflows must be a pandas DataFrame, got {type(cashflows).__name__}"
@@ -111,11 +148,7 @@ def compute_actus_asset_trajectory(
     horizon = _validate_non_bool_int(horizon_years, "horizon_years")
     cash_balance = _validate_non_bool_real(initial_cash, "initial_cash")
 
-    pam_specs = tuple(spec for spec in resolved_specs if isinstance(spec, PAMSpec))
-    stk_specs = tuple(spec for spec in resolved_specs if isinstance(spec, STKSpec))
-    csh_specs = tuple(spec for spec in resolved_specs if isinstance(spec, CSHSpec))
-
-    start_year = min(spec.start_year for spec in resolved_specs)
+    start_year = min(int(config.status_date.year) for config in resolved_contracts)
     rows: list[dict[str, float | int]] = []
     for year in range(start_year, start_year + horizon + 1):
         year_payoff = _cashflow_total(
@@ -136,9 +169,9 @@ def compute_actus_asset_trajectory(
             year=year,
             event_types={"MD", "TD"},
         )
-        pam_value = _pam_value(pam_specs, year=year)
-        stk_market_value = _stk_market_value(stk_specs, year=year)
-        csh_value = float(sum(spec.nominal_value for spec in csh_specs))
+        pam_value = _pam_value(resolved_contracts, year=year)
+        stk_market_value = _stk_market_value(resolved_contracts, year=year)
+        csh_value = _csh_value(resolved_contracts)
         closing_asset_value = (
             cash_balance + pam_value + stk_market_value + csh_value
         )

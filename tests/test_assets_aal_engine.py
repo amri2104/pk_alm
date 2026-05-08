@@ -1,26 +1,21 @@
-"""Tests for the required live-path AAL Asset Engine."""
-
-import os
-from pathlib import Path
+"""Tests for the ACTUS-native AAL Asset Engine."""
 
 import pandas as pd
 import pytest
 
-from pk_alm.actus_asset_engine.aal_asset_portfolio import (
-    AALAssetContractSpec,
-    CSHSpec,
-    DEFAULT_AAL_ASSET_CONTRACT_SPECS,
-    PAMSpec,
-    STKSpec,
-    get_default_aal_asset_contract_specs,
-)
-from pk_alm.actus_asset_engine.actus_adapter import aal_events_to_cashflow_dataframe
 from pk_alm.actus_asset_engine import aal_engine
-from pk_alm.actus_asset_engine.aal_engine import AALAssetEngineResult, run_aal_asset_engine
+from pk_alm.actus_asset_engine.aal_asset_portfolio import (
+    get_default_aal_asset_contract_configs,
+    make_pam_contract_config,
+)
+from pk_alm.actus_asset_engine.aal_engine import (
+    AALAssetEngineResult,
+    run_aal_asset_engine,
+)
+from pk_alm.actus_asset_engine.contract_config import AALContractConfig
+from pk_alm.actus_asset_engine.risk_factors import AALRiskFactorSet
+from pk_alm.actus_asset_engine.simulation_settings import AALSimulationSettings
 from pk_alm.cashflows.schema import CASHFLOW_COLUMNS, validate_cashflow_dataframe
-from pk_alm.scenarios.stage1_baseline import run_stage1_baseline
-
-_OUTPUTS_DIR = Path(__file__).resolve().parent.parent / "outputs" / "stage1_baseline"
 
 
 class _FakePAM:
@@ -51,17 +46,15 @@ class _FakePortfolio:
     def __init__(self, contracts):
         self.contracts = list(contracts)
 
-    def __len__(self):
-        return len(self.contracts)
-
     def to_dict(self):
         return [contract.to_dict() for contract in self.contracts]
 
 
 class _FakePublicActusService:
-    serverURL = "https://example.invalid"
+    last_risk_factors = "unset"
 
-    def generateEvents(self, *, portfolio):
+    def generateEvents(self, *, portfolio, riskFactors=None):
+        type(self).last_risk_factors = riskFactors
         events = []
         for contract in portfolio.contracts:
             terms = contract.to_dict()
@@ -69,14 +62,24 @@ class _FakePublicActusService:
             contract_type = terms["contractType"]
             notional = float(terms["notionalPrincipal"])
             if contract_type == "PAM":
-                coupon_rate = float(terms["nominalInterestRate"])
+                if "initialExchangeDate" in terms:
+                    events.append(
+                        {
+                            "contractId": contract_id,
+                            "time": terms["initialExchangeDate"],
+                            "type": "IED",
+                            "payoff": -notional,
+                            "nominalValue": notional,
+                            "currency": terms["currency"],
+                        }
+                    )
                 maturity = terms["maturityDate"]
                 events.append(
                     {
                         "contractId": contract_id,
                         "time": maturity,
                         "type": "IP",
-                        "payoff": notional * coupon_rate,
+                        "payoff": notional * float(terms["nominalInterestRate"]),
                         "nominalValue": notional,
                         "currency": terms["currency"],
                     }
@@ -113,9 +116,39 @@ class _FakeAALModule:
     PublicActusService = _FakePublicActusService
 
 
-def _custom_specs() -> tuple[AALAssetContractSpec, ...]:
+class _RiskFactor:
+    marketObjectCode = "CHF_LIBOR"
+
+    def to_json(self):
+        return {
+            "marketObjectCode": self.marketObjectCode,
+            "data": [{"time": "2026-01-01", "value": 0.01}],
+        }
+
+
+def _patch_fake_aal(monkeypatch) -> None:
+    monkeypatch.setattr(aal_engine, "get_aal_module", lambda: _FakeAALModule)
+    monkeypatch.setattr(aal_engine, "_detect_aal_version", lambda: "fake-1.0")
+    _FakePublicActusService.last_risk_factors = "unset"
+
+
+def _settings(
+    *,
+    start: str = "2026-01-01T00:00:00",
+    end: str = "2038-12-31T00:00:00",
+    cutoff: str = "from_status_date",
+) -> AALSimulationSettings:
+    return AALSimulationSettings(
+        analysis_date=start,
+        event_start_date=start,
+        event_end_date=end,
+        cashflow_cutoff_mode=cutoff,  # type: ignore[arg-type]
+    )
+
+
+def _current_bond() -> tuple[AALContractConfig, ...]:
     return (
-        PAMSpec(
+        make_pam_contract_config(
             contract_id="ENGINE_PAM_1",
             start_year=2026,
             maturity_year=2028,
@@ -125,332 +158,127 @@ def _custom_specs() -> tuple[AALAssetContractSpec, ...]:
     )
 
 
-def _mixed_specs() -> tuple[AALAssetContractSpec, ...]:
-    return (
-        PAMSpec("ENGINE_PAM_1", 2026, 2028, 100_000.0, 0.02),
-        STKSpec(
-            "ENGINE_STK_1",
-            2026,
-            2030,
-            quantity=1_000.0,
-            price_at_purchase=100.0,
-            price_at_termination=116.985856,
-            dividend_yield=0.025,
-            market_value_growth=0.04,
-        ),
-        CSHSpec(
-            "ENGINE_CSH_1",
-            2026,
-            50_000.0,
-        ),
+def _existing_bond() -> tuple[AALContractConfig, ...]:
+    terms = dict(_current_bond()[0].terms)
+    terms.update(
+        {
+            "contractDealDate": "2021-01-01T00:00:00",
+            "initialExchangeDate": "2021-01-01T00:00:00",
+            "statusDate": "2026-01-01T00:00:00",
+        }
+    )
+    return (AALContractConfig("PAM", terms),)
+
+
+def test_engine_returns_expanded_result_and_schema_valid_cashflows(monkeypatch):
+    _patch_fake_aal(monkeypatch)
+
+    result = run_aal_asset_engine(
+        contracts=_current_bond(),
+        settings=_settings(end="2029-12-31T00:00:00"),
     )
 
-
-def _patch_fake_aal(monkeypatch) -> None:
-    monkeypatch.setattr(aal_engine, "get_aal_module", lambda: _FakeAALModule)
-    monkeypatch.setattr(aal_engine, "_detect_aal_version", lambda: "fake-1.0")
-
-
-def test_engine_returns_schema_valid_cashflows(monkeypatch):
-    _patch_fake_aal(monkeypatch)
-    result = run_aal_asset_engine()
     assert isinstance(result, AALAssetEngineResult)
     assert validate_cashflow_dataframe(result.cashflows) is True
     assert list(result.cashflows.columns) == list(CASHFLOW_COLUMNS)
-
-
-def test_result_records_required_live_aal_path(monkeypatch):
-    _patch_fake_aal(monkeypatch)
-    result = run_aal_asset_engine()
-    assert result.generation_mode == "aal"
-    assert result.aal_available is True
     assert result.aal_version == "fake-1.0"
-    assert "PublicActusService" in " | ".join(result.notes)
+    assert result.generation_mode == "aal"
+    assert not result.event_summary.empty
+    assert not result.event_coverage_report.empty
+    assert result.risk_factor_report.empty
+    assert isinstance(result.limitation_report, pd.DataFrame)
 
 
-def test_engine_uses_default_specs_when_specs_none(monkeypatch):
+def test_engine_uses_default_contract_configs_when_contracts_none(monkeypatch):
     _patch_fake_aal(monkeypatch)
-    result = run_aal_asset_engine()
-    assert result.contracts == tuple(DEFAULT_AAL_ASSET_CONTRACT_SPECS)
+
+    result = run_aal_asset_engine(settings=_settings())
+
+    assert result.contracts == tuple(get_default_aal_asset_contract_configs())
 
 
-def test_engine_accepts_custom_specs(monkeypatch):
+def test_engine_passes_risk_factors_to_public_actus_service(monkeypatch):
     _patch_fake_aal(monkeypatch)
-    specs = _custom_specs()
-    result = run_aal_asset_engine(specs=specs)
-    assert result.contracts == specs
-    assert set(result.cashflows["contractId"]) == {"ENGINE_PAM_1"}
+    risk_factor = _RiskFactor()
+
+    result = run_aal_asset_engine(
+        contracts=_current_bond(),
+        risk_factors=AALRiskFactorSet((risk_factor,)),
+        settings=_settings(end="2029-12-31T00:00:00"),
+    )
+
+    assert _FakePublicActusService.last_risk_factors == (risk_factor,)
+    assert result.risk_factor_report.iloc[0]["marketObjectCode"] == "CHF_LIBOR"
 
 
-def test_engine_dispatches_mixed_specs_with_server_events_only(monkeypatch):
+def test_engine_passes_none_when_no_risk_factors(monkeypatch):
     _patch_fake_aal(monkeypatch)
-    result = run_aal_asset_engine(specs=_mixed_specs())
 
-    sources = set(result.cashflows["source"])
-    assert sources == {"ACTUS"}
-    assert set(result.cashflows["type"]) == {"IP", "MD", "TD"}
-    assert "ENGINE_CSH_1" not in set(result.cashflows["contractId"])
-    assert "Processed specs: 1 PAM, 1 STK, 1 CSH" in " | ".join(result.notes)
-    assert "Server events: 3" in " | ".join(result.notes)
-    assert "CSH contracts return no temporal events" in " | ".join(result.notes)
+    run_aal_asset_engine(
+        contracts=_current_bond(),
+        settings=_settings(end="2029-12-31T00:00:00"),
+    )
+
+    assert _FakePublicActusService.last_risk_factors is None
 
 
-def test_engine_rejects_empty_specs(monkeypatch):
+def test_existing_bond_excludes_historical_initial_exchange_by_default(monkeypatch):
     _patch_fake_aal(monkeypatch)
-    with pytest.raises(ValueError):
-        run_aal_asset_engine(specs=[])
+
+    result = run_aal_asset_engine(
+        contracts=_existing_bond(),
+        settings=_settings(end="2029-12-31T00:00:00"),
+    )
+
+    assert set(result.cashflows["type"]) == {"IP", "MD"}
+    assert result.cashflows["time"].min() >= pd.Timestamp("2026-01-01")
 
 
-def test_engine_rejects_non_spec_items(monkeypatch):
+def test_new_purchase_keeps_initial_exchange_on_status_date(monkeypatch):
     _patch_fake_aal(monkeypatch)
-    with pytest.raises(TypeError):
-        run_aal_asset_engine(specs=[{"contract_id": "BAD"}])  # type: ignore[list-item]
+
+    result = run_aal_asset_engine(
+        contracts=_current_bond(),
+        settings=_settings(end="2029-12-31T00:00:00"),
+    )
+
+    assert "IED" in set(result.cashflows["type"])
+    ied = result.cashflows.loc[result.cashflows["type"].eq("IED")].iloc[0]
+    assert ied["time"] == pd.Timestamp("2026-01-01")
 
 
-def test_engine_wraps_contract_construction_failures(monkeypatch):
-    class _BadModule(_FakeAALModule):
-        class PAM:  # noqa: N801
-            def __init__(self, **terms):
-                raise ValueError("bad pam")
+def test_all_events_keeps_historical_events_but_applies_end_date(monkeypatch):
+    _patch_fake_aal(monkeypatch)
 
-    monkeypatch.setattr(aal_engine, "get_aal_module", lambda: _BadModule)
-    with pytest.raises(RuntimeError, match="AAL contract or Portfolio construction"):
-        run_aal_asset_engine(specs=_custom_specs())
+    result = run_aal_asset_engine(
+        contracts=_existing_bond(),
+        settings=_settings(end="2026-12-31T00:00:00", cutoff="all_events"),
+    )
+
+    assert set(result.cashflows["type"]) == {"IED"}
+    assert result.cashflows.iloc[0]["time"] == pd.Timestamp("2021-01-01")
+
+
+def test_engine_rejects_invalid_risk_factor(monkeypatch):
+    _patch_fake_aal(monkeypatch)
+
+    with pytest.raises(ValueError, match="marketObjectCode"):
+        run_aal_asset_engine(
+            contracts=_current_bond(),
+            risk_factors=(object(),),
+            settings=_settings(),
+        )
 
 
 def test_engine_wraps_service_failures(monkeypatch):
     class _BadService:
-        def generateEvents(self, *, portfolio):
+        def generateEvents(self, *, portfolio, riskFactors=None):
             raise RuntimeError("service down")
 
-    class _BadServiceModule(_FakeAALModule):
+    class _BadModule(_FakeAALModule):
         PublicActusService = _BadService
 
-    monkeypatch.setattr(aal_engine, "get_aal_module", lambda: _BadServiceModule)
+    monkeypatch.setattr(aal_engine, "get_aal_module", lambda: _BadModule)
+
     with pytest.raises(RuntimeError, match="PublicActusService failed"):
-        run_aal_asset_engine(specs=_custom_specs())
-
-
-def test_engine_wraps_mapping_failures(monkeypatch):
-    class _BadMappingService:
-        def generateEvents(self, *, portfolio):
-            return [{"contractID": "BROKEN"}]
-
-    class _BadMappingModule(_FakeAALModule):
-        PublicActusService = _BadMappingService
-
-    monkeypatch.setattr(aal_engine, "get_aal_module", lambda: _BadMappingModule)
-    with pytest.raises(RuntimeError, match="event mapping"):
-        run_aal_asset_engine(specs=_custom_specs())
-
-
-def test_synthetic_aal_dict_event_maps_to_schema():
-    event = {
-        "contractID": "BOND_X",
-        "eventDate": "2027-12-31",
-        "eventType": "IP",
-        "payoff": 2000.0,
-        "nominalValue": 100000.0,
-        "currency": "CHF",
-    }
-    df = aal_events_to_cashflow_dataframe(event)
-    assert validate_cashflow_dataframe(df) is True
-    assert len(df) == 1
-    assert df.iloc[0]["contractId"] == "BOND_X"
-    assert df.iloc[0]["type"] == "IP"
-    assert df.iloc[0]["payoff"] == pytest.approx(2000.0)
-    assert df.iloc[0]["source"] == "ACTUS"
-
-
-def test_synthetic_aal_list_of_dicts_maps_to_schema():
-    events = [
-        {
-            "contractID": "B1",
-            "eventDate": "2027-12-31",
-            "eventType": "IP",
-            "payoff": 1500.0,
-        },
-        {
-            "contractID": "B1",
-            "eventDate": "2028-12-31",
-            "eventType": "MD",
-            "payoff": 75000.0,
-        },
-    ]
-    df = aal_events_to_cashflow_dataframe(events)
-    assert validate_cashflow_dataframe(df) is True
-    assert len(df) == 2
-    assert (df["source"] == "ACTUS").all()
-
-
-def test_synthetic_aal_dataframe_camelcase_keys_maps_to_schema():
-    df_in = pd.DataFrame(
-        [
-            {
-                "contractID": "B2",
-                "eventDate": "2027-12-31",
-                "eventType": "IP",
-                "payoff": 1000.0,
-                "nominalValue": 50000.0,
-                "currency": "CHF",
-            }
-        ]
-    )
-    df = aal_events_to_cashflow_dataframe(df_in)
-    assert validate_cashflow_dataframe(df) is True
-    assert df.iloc[0]["contractId"] == "B2"
-    assert df.iloc[0]["nominalValue"] == pytest.approx(50000.0)
-
-
-def test_synthetic_aal_dataframe_snakecase_keys_maps_to_schema():
-    df_in = pd.DataFrame(
-        [
-            {
-                "contract_id": "B3",
-                "event_date": "2027-12-31",
-                "event_type": "IP",
-                "payoff": 500.0,
-            }
-        ]
-    )
-    df = aal_events_to_cashflow_dataframe(df_in)
-    assert validate_cashflow_dataframe(df) is True
-    assert df.iloc[0]["contractId"] == "B3"
-    assert df.iloc[0]["currency"] == "CHF"
-    assert df.iloc[0]["nominalValue"] == pytest.approx(0.0)
-
-
-def test_aal_events_mapper_extracts_events_df_attribute():
-    class _Wrapper:
-        def __init__(self, df):
-            self.events_df = df
-
-    wrapper = _Wrapper(
-        pd.DataFrame(
-            [
-                {
-                    "contractID": "B4",
-                    "eventDate": "2027-12-31",
-                    "eventType": "IP",
-                    "payoff": 100.0,
-                }
-            ]
-        )
-    )
-    df = aal_events_to_cashflow_dataframe(wrapper)
-    assert validate_cashflow_dataframe(df) is True
-    assert df.iloc[0]["contractId"] == "B4"
-
-
-def test_aal_events_mapper_rejects_unknown_shape():
-    with pytest.raises(TypeError):
-        aal_events_to_cashflow_dataframe(42)
-
-
-def test_aal_events_mapper_rejects_event_with_missing_required_keys():
-    with pytest.raises(ValueError):
-        aal_events_to_cashflow_dataframe(
-            {"contractID": "B5", "eventDate": "2027-12-31", "eventType": "IP"}
-        )
-
-
-def test_aal_events_mapper_rejects_non_dict_inside_list():
-    with pytest.raises(TypeError):
-        aal_events_to_cashflow_dataframe([42])
-
-
-def test_aal_events_mapper_default_currency_can_be_overridden():
-    df = aal_events_to_cashflow_dataframe(
-        {
-            "contractID": "B6",
-            "eventDate": "2027-12-31",
-            "eventType": "IP",
-            "payoff": 100.0,
-        },
-        default_currency="USD",
-    )
-    assert df.iloc[0]["currency"] == "USD"
-
-
-def _good_result_kwargs(monkeypatch) -> dict:
-    _patch_fake_aal(monkeypatch)
-    result = run_aal_asset_engine(specs=_custom_specs())
-    return {
-        "cashflows": result.cashflows,
-        "contracts": result.contracts,
-        "aal_version": result.aal_version,
-        "notes": result.notes,
-    }
-
-
-def test_result_dataclass_rejects_non_asset_source_rows(monkeypatch):
-    kwargs = _good_result_kwargs(monkeypatch)
-    bad = kwargs["cashflows"].copy()
-    bad.loc[0, "source"] = "BVG"
-    kwargs["cashflows"] = bad
-    with pytest.raises(ValueError):
-        AALAssetEngineResult(**kwargs)
-
-
-def test_result_dataclass_rejects_actus_proxy_source_rows(monkeypatch):
-    kwargs = _good_result_kwargs(monkeypatch)
-    proxy = kwargs["cashflows"].copy()
-    proxy.loc[0, "source"] = "ACTUS_PROXY"
-    kwargs["cashflows"] = proxy
-    with pytest.raises(ValueError, match="source"):
-        AALAssetEngineResult(**kwargs)
-
-
-def test_result_dataclass_rejects_invalid_fixed_generation_mode(monkeypatch):
-    kwargs = _good_result_kwargs(monkeypatch)
-    kwargs["generation_mode"] = "fallback"
-    with pytest.raises(ValueError):
-        AALAssetEngineResult(**kwargs)
-
-
-def test_result_dataclass_rejects_false_aal_available(monkeypatch):
-    kwargs = _good_result_kwargs(monkeypatch)
-    kwargs["aal_available"] = False
-    with pytest.raises(ValueError):
-        AALAssetEngineResult(**kwargs)
-
-
-def test_result_dataclass_rejects_non_dataframe_cashflows(monkeypatch):
-    kwargs = _good_result_kwargs(monkeypatch)
-    kwargs["cashflows"] = "not a dataframe"
-    with pytest.raises(TypeError):
-        AALAssetEngineResult(**kwargs)
-
-
-def test_engine_does_not_modify_stage1_baseline_outputs(monkeypatch):
-    _patch_fake_aal(monkeypatch)
-    before = run_stage1_baseline(output_dir=None)
-    run_aal_asset_engine(specs=_custom_specs())
-    after = run_stage1_baseline(output_dir=None)
-    pd.testing.assert_frame_equal(before.engine_result.cashflows, after.engine_result.cashflows)
-    pd.testing.assert_frame_equal(before.annual_cashflows, after.annual_cashflows)
-    pd.testing.assert_frame_equal(
-        before.funding_ratio_trajectory,
-        after.funding_ratio_trajectory,
-    )
-
-
-def test_stage1_output_csv_files_not_modified_by_engine(monkeypatch):
-    _patch_fake_aal(monkeypatch)
-    if not _OUTPUTS_DIR.exists():
-        pytest.skip("outputs/stage1_baseline/ does not exist")
-    csv_files = list(_OUTPUTS_DIR.glob("*.csv"))
-    assert csv_files, "expected CSV files in outputs/stage1_baseline/"
-
-    mtimes_before = {f: os.path.getmtime(f) for f in csv_files}
-    run_aal_asset_engine(specs=_custom_specs())
-    mtimes_after = {f: os.path.getmtime(f) for f in csv_files}
-    assert mtimes_before == mtimes_after
-
-
-def test_required_aal_default_specs_can_run_against_live_service():
-    result = run_aal_asset_engine(specs=tuple(get_default_aal_asset_contract_specs()))
-    assert result.generation_mode == "aal"
-    assert result.aal_available is True
-    assert validate_cashflow_dataframe(result.cashflows) is True
-    assert set(result.cashflows["source"]) == {"ACTUS"}
+        run_aal_asset_engine(contracts=_current_bond(), settings=_settings())

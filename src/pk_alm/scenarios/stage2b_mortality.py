@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from pk_alm.actus_asset_engine.aal_asset_portfolio import AssetSpec
+from pk_alm.actus_asset_engine.contract_config import AALContractConfig
 from pk_alm.alm_analytics_engine.cashflows import (
     find_liquidity_inflection_year,
     summarize_cashflows_by_year,
@@ -176,7 +176,7 @@ def run_stage2b_mortality(
     turnover_rate: float = 0.02,
     entry_assumptions: EntryAssumptions | None = None,
     asset_mode: AssetMode = ASSET_MODE_DETERMINISTIC,
-    asset_specs: tuple[AssetSpec, ...] | list[AssetSpec] | None = None,
+    asset_contracts: tuple[AALContractConfig, ...] | list[AALContractConfig] | None = None,
     output_dir: str | Path | None = "outputs/stage2b_mortality",
 ) -> Stage2BMortalityResult:
     """Run Stage 2B mortality over the Stage-2A population path.
@@ -214,7 +214,7 @@ def run_stage2b_mortality(
         turnover_rate=turnover_rate,
         entry_assumptions=entry_assumptions,
         asset_mode=resolved_asset_mode,
-        asset_specs=asset_specs,
+        asset_contracts=asset_contracts,
         output_dir=None,
     )
 
@@ -267,7 +267,7 @@ def run_stage2b_mortality(
             ) = _build_actus_mode_outputs(
                 valuation_snapshots=stage2a.valuation_snapshots,
                 liability_cashflows=liability_cashflows,
-                asset_specs=asset_specs,
+                asset_contracts=asset_contracts,
                 target_funding_ratio=target_funding_ratio,
                 start_year=start_year,
                 horizon_years=horizon_years,

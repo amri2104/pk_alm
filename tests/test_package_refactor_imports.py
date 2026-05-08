@@ -11,10 +11,10 @@ def test_new_bvg_liability_engine_import_paths():
 
 def test_new_actus_asset_engine_import_paths():
     from pk_alm.actus_asset_engine.aal_engine import AALAssetEngineResult
-    from pk_alm.actus_asset_engine.aal_asset_portfolio import PAMSpec
+    from pk_alm.actus_asset_engine.contract_config import AALContractConfig
 
     assert AALAssetEngineResult.__name__ == "AALAssetEngineResult"
-    assert PAMSpec.__name__ == "PAMSpec"
+    assert AALContractConfig.__name__ == "AALContractConfig"
 
 
 def test_new_alm_analytics_engine_import_paths():

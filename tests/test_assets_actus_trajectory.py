@@ -1,124 +1,115 @@
-"""Tests for ACTUS-mode asset trajectory snapshots."""
+"""Tests for ACTUS asset trajectory from contract configs."""
 
 import pandas as pd
 import pytest
 
-from pk_alm.actus_asset_engine.aal_asset_portfolio import CSHSpec, PAMSpec, STKSpec
+from pk_alm.actus_asset_engine.aal_asset_portfolio import (
+    make_csh_contract_config,
+    make_pam_contract_config,
+    make_stk_contract_config_from_nominal,
+)
 from pk_alm.actus_asset_engine.actus_trajectory import (
     ACTUS_ASSET_TRAJECTORY_COLUMNS,
     compute_actus_asset_trajectory,
 )
-from pk_alm.cashflows.schema import CashflowRecord, cashflow_records_to_dataframe
+from pk_alm.cashflows.schema import CASHFLOW_COLUMNS
 
 
-def _specs():
+def _configs():
     return (
-        PAMSpec("PAM_1", 2026, 2028, 100_000.0, 0.02),
-        STKSpec(
-            "STK_1",
-            2026,
-            2029,
-            quantity=1_000.0,
-            price_at_purchase=100.0,
-            price_at_termination=112.4864,
+        make_pam_contract_config(
+            contract_id="PAM_1",
+            start_year=2026,
+            maturity_year=2028,
+            nominal_value=100_000.0,
+            coupon_rate=0.02,
+        ),
+        make_stk_contract_config_from_nominal(
+            contract_id="STK_1",
+            start_year=2026,
+            divestment_year=2030,
+            nominal_value=200_000.0,
             dividend_yield=0.025,
             market_value_growth=0.04,
         ),
-        CSHSpec("CSH_1", 2026, 50_000.0),
+        make_csh_contract_config(
+            contract_id="CSH_1",
+            start_year=2026,
+            nominal_value=50_000.0,
+        ),
     )
 
 
 def _cashflows():
-    records = [
-        CashflowRecord(
-            "PAM_1",
-            "2028-12-31T00:00:00",
-            "IP",
-            2_000.0,
-            100_000.0,
-            source="ACTUS",
-        ),
-        CashflowRecord(
-            "PAM_1",
-            "2028-12-31T00:00:00",
-            "MD",
-            100_000.0,
-            0.0,
-            source="ACTUS",
-        ),
-        CashflowRecord(
-            "STK_1",
-            "2029-12-31T00:00:00",
-            "TD",
-            112_486.4,
-            0.0,
-            source="ACTUS",
-        ),
-    ]
-    return cashflow_records_to_dataframe(records)
+    return pd.DataFrame(
+        [
+            {
+                "contractId": "PAM_1",
+                "time": pd.Timestamp("2027-12-31"),
+                "type": "IP",
+                "payoff": 2_000.0,
+                "nominalValue": 100_000.0,
+                "currency": "CHF",
+                "source": "ACTUS",
+            },
+            {
+                "contractId": "PAM_1",
+                "time": pd.Timestamp("2028-12-31"),
+                "type": "MD",
+                "payoff": 100_000.0,
+                "nominalValue": 0.0,
+                "currency": "CHF",
+                "source": "ACTUS",
+            },
+            {
+                "contractId": "STK_1",
+                "time": pd.Timestamp("2030-12-31"),
+                "type": "TD",
+                "payoff": 233_971.712,
+                "nominalValue": 0.0,
+                "currency": "CHF",
+                "source": "ACTUS",
+            },
+        ],
+        columns=list(CASHFLOW_COLUMNS),
+    )
 
 
-def test_trajectory_has_expected_columns_and_decomposition():
-    trajectory = compute_actus_asset_trajectory(
-        _specs(),
+def test_compute_actus_asset_trajectory_schema_and_horizon():
+    result = compute_actus_asset_trajectory(
+        _configs(),
         _cashflows(),
-        horizon_years=3,
+        horizon_years=4,
         initial_cash=10_000.0,
     )
 
-    assert list(trajectory.columns) == list(ACTUS_ASSET_TRAJECTORY_COLUMNS)
-    assert list(trajectory["year"]) == [2026, 2027, 2028, 2029]
-
-    for _, row in trajectory.iterrows():
-        expected = (
-            row["cash_balance"]
-            + row["pam_value"]
-            + row["stk_market_value"]
-            + row["csh_value"]
-        )
-        assert row["closing_asset_value"] == pytest.approx(expected)
+    assert list(result.columns) == list(ACTUS_ASSET_TRAJECTORY_COLUMNS)
+    assert result["year"].tolist() == [2026, 2027, 2028, 2029, 2030]
 
 
-def test_pam_value_drops_to_zero_after_maturity_year_end():
-    trajectory = compute_actus_asset_trajectory(_specs(), _cashflows(), 3)
-    assert trajectory.loc[trajectory["year"] == 2027, "pam_value"].iloc[0] == 100_000.0
-    assert trajectory.loc[trajectory["year"] == 2028, "pam_value"].iloc[0] == 0.0
-
-
-def test_stk_market_value_drops_to_zero_after_divestment_year_end():
-    trajectory = compute_actus_asset_trajectory(_specs(), _cashflows(), 3)
-    assert trajectory.loc[trajectory["year"] == 2028, "stk_market_value"].iloc[
-        0
-    ] == pytest.approx(100_000.0 * (1.04**2))
-    assert trajectory.loc[trajectory["year"] == 2029, "stk_market_value"].iloc[0] == 0.0
-
-
-def test_cash_balance_accumulates_realized_asset_cashflows():
-    trajectory = compute_actus_asset_trajectory(
-        _specs(),
+def test_compute_actus_asset_trajectory_values_open_and_matured_positions():
+    result = compute_actus_asset_trajectory(
+        _configs(),
         _cashflows(),
-        horizon_years=3,
+        horizon_years=4,
         initial_cash=10_000.0,
     )
-    cash_by_year = dict(zip(trajectory["year"], trajectory["cash_balance"]))
-    assert cash_by_year[2026] == pytest.approx(10_000.0)
-    assert cash_by_year[2027] == pytest.approx(10_000.0)
-    assert cash_by_year[2028] == pytest.approx(112_000.0)
-    assert cash_by_year[2029] == pytest.approx(224_486.4)
+
+    row_2026 = result.loc[result["year"].eq(2026)].iloc[0]
+    row_2027 = result.loc[result["year"].eq(2027)].iloc[0]
+    row_2028 = result.loc[result["year"].eq(2028)].iloc[0]
+    row_2030 = result.loc[result["year"].eq(2030)].iloc[0]
+
+    assert row_2026["pam_value"] == pytest.approx(100_000.0)
+    assert row_2026["stk_market_value"] == pytest.approx(200_000.0)
+    assert row_2026["csh_value"] == pytest.approx(50_000.0)
+    assert row_2027["cash_balance"] == pytest.approx(12_000.0)
+    assert row_2027["coupon_income"] == pytest.approx(2_000.0)
+    assert row_2028["pam_value"] == pytest.approx(0.0)
+    assert row_2028["realized_maturity_or_td"] == pytest.approx(100_000.0)
+    assert row_2030["stk_market_value"] == pytest.approx(0.0)
 
 
-def test_income_columns_split_coupon_and_realizations():
-    trajectory = compute_actus_asset_trajectory(_specs(), _cashflows(), 3)
-    row_2027 = trajectory[trajectory["year"] == 2027].iloc[0]
-    row_2028 = trajectory[trajectory["year"] == 2028].iloc[0]
-    row_2029 = trajectory[trajectory["year"] == 2029].iloc[0]
-
-    assert row_2027["coupon_income"] == 0.0
-    assert row_2028["coupon_income"] == 2_000.0
-    assert row_2028["realized_maturity_or_td"] == 100_000.0
-    assert row_2029["realized_maturity_or_td"] == 112_486.4
-
-
-def test_trajectory_rejects_empty_specs():
-    with pytest.raises(ValueError):
-        compute_actus_asset_trajectory((), pd.DataFrame(), 3)
+def test_compute_actus_asset_trajectory_rejects_non_config_items():
+    with pytest.raises(TypeError):
+        compute_actus_asset_trajectory([{"contractID": "BAD"}], _cashflows(), 1)

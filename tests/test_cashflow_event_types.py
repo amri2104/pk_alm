@@ -10,6 +10,7 @@ from pk_alm.cashflows.event_types import (
     BVG_EVENT_TYPES,
     EX,
     EXPECTED_PAYOFF_SIGNS,
+    IED,
     IN,
     IP,
     KA,
@@ -37,6 +38,7 @@ def test_bvg_constants_match_codes() -> None:
 
 
 def test_actus_constants_match_codes() -> None:
+    assert IED == "IED"
     assert IP == "IP"
     assert MD == "MD"
     assert TD == "TD"
@@ -47,7 +49,7 @@ def test_bvg_event_types_set_complete() -> None:
 
 
 def test_actus_event_types_set_complete() -> None:
-    assert set(ACTUS_EVENT_TYPES) == {IP, MD, TD}
+    assert set(ACTUS_EVENT_TYPES) == {IED, IP, MD, TD}
 
 
 def test_expected_signs_cover_every_event_type() -> None:
@@ -61,7 +63,7 @@ def test_expected_signs_values() -> None:
     assert EXPECTED_PAYOFF_SIGNS[RP] == "non_positive"
     assert EXPECTED_PAYOFF_SIGNS[KA] == "non_positive"
     assert EXPECTED_PAYOFF_SIGNS[EX] == "non_positive"
-    for code in (IP, MD, TD):
+    for code in (IED, IP, MD, TD):
         assert EXPECTED_PAYOFF_SIGNS[code] == "any"
 
 

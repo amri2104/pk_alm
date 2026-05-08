@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from pk_alm.actus_asset_engine.aal_asset_portfolio import AssetSpec
+from pk_alm.actus_asset_engine.contract_config import AALContractConfig
 from pk_alm.alm_analytics_engine.cashflows import (
     find_liquidity_inflection_year,
     summarize_cashflows_by_year,
@@ -35,6 +35,7 @@ from pk_alm.actus_asset_engine.aal_engine import (
     run_aal_asset_engine,
 )
 from pk_alm.actus_asset_engine.deterministic import build_deterministic_asset_trajectory
+from pk_alm.actus_asset_engine.simulation_settings import AALSimulationSettings
 from pk_alm.bvg_liability_engine.assumptions import (
     BVGAssumptions,
     FlatRateCurve,
@@ -129,7 +130,7 @@ def run_full_alm_scenario(
     valuation_terminal_age: int = 90,
     target_funding_ratio: float = 1.076,
     annual_asset_return: float = 0.0,
-    asset_specs: tuple[AssetSpec, ...] | list[AssetSpec] | None = None,
+    asset_contracts: tuple[AALContractConfig, ...] | list[AALContractConfig] | None = None,
 ) -> FullALMScenarioResult:
     """Run the BVG liability engine and the AAL Asset Engine and combine results.
 
@@ -218,7 +219,16 @@ def run_full_alm_scenario(
         actus_asset_trajectory=None,
     )
 
-    aal_asset_result = run_aal_asset_engine(specs=asset_specs)
+    aal_asset_result = run_aal_asset_engine(
+        contracts=asset_contracts,
+        settings=AALSimulationSettings(
+            analysis_date=f"{start_year}-01-01T00:00:00",
+            event_start_date=f"{start_year}-01-01T00:00:00",
+            event_end_date=f"{start_year + horizon_years}-12-31T00:00:00",
+            mode="validated",
+            cashflow_cutoff_mode="from_status_date",
+        ),
+    )
 
     bvg_cashflows = stage1_result.engine_result.cashflows
     asset_cashflows = aal_asset_result.cashflows

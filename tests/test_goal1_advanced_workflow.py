@@ -16,7 +16,7 @@ from pk_alm.workflows.goal1_advanced_workflow import (
     PROTECTED_OUTPUT_DIRS,
     STAGE_COMPARISON_OUTPUT_DIR,
     Goal1AdvancedInput,
-    asset_table_to_specs,
+    asset_table_to_contract_configs,
     population_tables_to_portfolio_state,
     run_goal1_advanced_alm,
     suggest_mortality_table_from_gender,
@@ -70,14 +70,14 @@ def test_population_tables_to_portfolio_state() -> None:
     assert len(state.retired_cohorts) == len(DEFAULT_RETIREE_TABLE)
 
 
-def test_asset_table_to_specs_default() -> None:
-    specs = asset_table_to_specs(
+def test_asset_table_to_contract_configs_default() -> None:
+    contracts = asset_table_to_contract_configs(
         DEFAULT_ALLOCATION_TABLE,
         DEFAULT_BOND_TABLE,
         start_year=2026,
         target_assets=10_000_000.0,
     )
-    assert len(specs) > 0
+    assert len(contracts) > 0
 
 
 def test_suggest_mortality_table_from_gender_female() -> None:
@@ -134,24 +134,24 @@ def test_scenario_presets_run_without_error(preset: str, tmp_path: Path) -> None
 
 
 def test_assumption_income_cashflows_emitted_per_yield_year() -> None:
-    from pk_alm.actus_asset_engine.aal_asset_portfolio import STKSpec
+    from pk_alm.actus_asset_engine.aal_asset_portfolio import (
+        make_stk_contract_config_from_nominal,
+    )
     from pk_alm.workflows.goal1_advanced_workflow import (
         _build_assumption_income_cashflows,
     )
 
-    spec = STKSpec(
+    contract = make_stk_contract_config_from_nominal(
         contract_id="TEST_EQ",
         start_year=2026,
         divestment_year=2031,
-        quantity=100.0,
-        price_at_purchase=100.0,
-        price_at_termination=140.0,
+        nominal_value=10_000.0,
         currency="CHF",
         dividend_yield=0.025,
         market_value_growth=0.04,
     )
     df = _build_assumption_income_cashflows(
-        (spec,), horizon_years=5, start_year=2026
+        (contract,), horizon_years=5, start_year=2026
     )
     assert len(df) == 5
     assert (df["type"] == "IP").all()
@@ -160,23 +160,23 @@ def test_assumption_income_cashflows_emitted_per_yield_year() -> None:
 
 
 def test_assumption_income_cashflows_skips_zero_yield_specs() -> None:
-    from pk_alm.actus_asset_engine.aal_asset_portfolio import STKSpec
+    from pk_alm.actus_asset_engine.aal_asset_portfolio import (
+        make_stk_contract_config_from_nominal,
+    )
     from pk_alm.workflows.goal1_advanced_workflow import (
         _build_assumption_income_cashflows,
     )
 
-    spec = STKSpec(
+    contract = make_stk_contract_config_from_nominal(
         contract_id="TEST_ALT",
         start_year=2026,
         divestment_year=2030,
-        quantity=10.0,
-        price_at_purchase=100.0,
-        price_at_termination=110.0,
+        nominal_value=1_000.0,
         currency="CHF",
         dividend_yield=0.0,
         market_value_growth=0.03,
     )
     df = _build_assumption_income_cashflows(
-        (spec,), horizon_years=4, start_year=2026
+        (contract,), horizon_years=4, start_year=2026
     )
     assert df.empty

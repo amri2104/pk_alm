@@ -21,11 +21,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from pk_alm.actus_asset_engine.aal_asset_portfolio import (
-    AssetSpec,
-    CSHSpec,
-    PAMSpec,
-    STKSpec,
-    validate_aal_asset_contract_specs,
+    make_csh_contract_config,
+    make_pam_contract_config,
+    make_stk_contract_config_from_nominal,
+)
+from pk_alm.actus_asset_engine.contract_config import (
+    AALContractConfig,
+    validate_aal_contract_configs,
 )
 from pk_alm.alm_analytics_engine.cashflows import (
     find_liquidity_inflection_year,
@@ -38,6 +40,7 @@ from pk_alm.alm_analytics_engine.funding_summary import (
 )
 from pk_alm.actus_asset_engine.actus_trajectory import compute_actus_asset_trajectory
 from pk_alm.actus_asset_engine.deterministic import build_deterministic_asset_trajectory
+from pk_alm.actus_asset_engine.simulation_settings import AALSimulationSettings
 from pk_alm.bvg_liability_engine.assumptions import (
     BVGAssumptions,
     FlatRateCurve,
@@ -263,7 +266,7 @@ class Goal1AdvancedResult:
     output_dir: Path
     input: Goal1AdvancedInput
     initial_state: BVGPortfolioState
-    asset_specs: tuple[AssetSpec, ...]
+    asset_contracts: tuple[AALContractConfig, ...]
     engine_result: BVGEngineResult
     cashflows: pd.DataFrame
     valuation_snapshots: pd.DataFrame
@@ -370,7 +373,7 @@ def run_goal1_advanced_alm(input_data: Goal1AdvancedInput) -> Goal1AdvancedResul
     annual_cashflows = summarize_cashflows_by_year(cashflows)
     valuation_for_funding = _valuation_for_funding_schema(valuation_snapshots)
 
-    asset_specs = asset_table_to_specs(
+    asset_contracts = asset_table_to_contract_configs(
         shocked.allocation_table,
         shocked.bond_table,
         start_year=shocked.start_year,
@@ -380,7 +383,7 @@ def run_goal1_advanced_alm(input_data: Goal1AdvancedInput) -> Goal1AdvancedResul
     )
     if shocked.asset_engine_mode == "actus":
         asset_snapshots, combined_cashflows = _build_actus_assets_and_cashflows(
-            asset_specs=asset_specs,
+            asset_contracts=asset_contracts,
             liability_cashflows=cashflows,
             valuation_for_funding=valuation_for_funding,
             target_funding_ratio=shocked.target_funding_ratio,
@@ -405,7 +408,7 @@ def run_goal1_advanced_alm(input_data: Goal1AdvancedInput) -> Goal1AdvancedResul
         # synthesised here because deterministic-proxy never runs ACTUS;
         # in ACTUS mode this branch is skipped, so no double-counting.
         assumption_cashflows = _build_assumption_income_cashflows(
-            asset_specs,
+            asset_contracts,
             horizon_years=shocked.horizon_years,
             start_year=shocked.start_year,
             include_pam_coupons=True,
@@ -500,7 +503,7 @@ def run_goal1_advanced_alm(input_data: Goal1AdvancedInput) -> Goal1AdvancedResul
         output_dir=out_path,
         input=shocked,
         initial_state=initial_state,
-        asset_specs=asset_specs,
+        asset_contracts=asset_contracts,
         engine_result=stage2c_engine,
         cashflows=cashflows_for_analytics,
         valuation_snapshots=valuation_snapshots,
@@ -560,20 +563,20 @@ def run_goal1_stage_comparison(
     return StageComparisonResult(out_path, comparison, explanations, output_paths)
 
 
-def asset_table_to_specs(
+def asset_table_to_contract_configs(
     allocation_table: pd.DataFrame,
     bond_table: pd.DataFrame,
     *,
     start_year: int,
     target_assets: float,
     horizon_years: int = 12,
-) -> tuple[AssetSpec, ...]:
-    """Convert cockpit allocation/bond tables into existing AAL AssetSpec objects."""
+) -> tuple[AALContractConfig, ...]:
+    """Convert cockpit allocation/bond tables into ACTUS contract configs."""
     allocations = _allocation_weights(allocation_table)
     target = _validate_real(target_assets, "target_assets", min_value=0.0, strict=True)
     start = _validate_int(start_year, "start_year", min_value=2000)
     horizon = _validate_int(horizon_years, "horizon_years", min_value=1)
-    specs: list[AssetSpec] = []
+    contracts: list[AALContractConfig] = []
 
     bond_bucket = target * allocations.get("bonds", 0.0)
     bonds = _validate_columns(bond_table, BOND_COLUMNS, "bond_table")
@@ -584,13 +587,15 @@ def asset_table_to_specs(
         maturity_years = _validate_int(row["maturity_years"], "maturity_years", min_value=1)
         notional = _validate_real(row["notional"], "notional", min_value=0.0, strict=True)
         scaled_notional = bond_bucket * notional / total_bond_notional
-        specs.append(
-            PAMSpec(
+        contracts.append(
+            make_pam_contract_config(
                 contract_id=str(row["contract_id"]).strip(),
                 start_year=start,
                 maturity_year=start + maturity_years,
                 nominal_value=scaled_notional,
-                coupon_rate=_validate_real(row["coupon_rate"], "coupon_rate", min_value=0.0),
+                coupon_rate=_validate_real(
+                    row["coupon_rate"], "coupon_rate", min_value=0.0
+                ),
                 currency=str(row["currency"]).strip().upper(),
             )
         )
@@ -601,11 +606,22 @@ def asset_table_to_specs(
     ):
         nominal = target * allocations.get(asset_class, 0.0)
         if nominal > 0:
-            specs.append(_stk_spec(asset_class, start, nominal, dividend_yield, growth, horizon))
+            contracts.append(
+                _stk_contract_config(
+                    asset_class, start, nominal, dividend_yield, growth, horizon
+                )
+            )
     cash_nominal = target * allocations.get("cash", 0.0)
     if cash_nominal > 0:
-        specs.append(CSHSpec("COCKPIT_CASH", start, cash_nominal, "CHF"))
-    return validate_aal_asset_contract_specs(tuple(specs))
+        contracts.append(
+            make_csh_contract_config(
+                contract_id="COCKPIT_CASH",
+                start_year=start,
+                nominal_value=cash_nominal,
+                currency="CHF",
+            )
+        )
+    return validate_aal_contract_configs(tuple(contracts))
 
 
 def population_tables_to_portfolio_state(
@@ -834,7 +850,7 @@ def _valuation_for_funding_schema(valuation: pd.DataFrame) -> pd.DataFrame:
 
 def _build_actus_assets_and_cashflows(
     *,
-    asset_specs: tuple[AssetSpec, ...],
+    asset_contracts: tuple[AALContractConfig, ...],
     liability_cashflows: pd.DataFrame,
     valuation_for_funding: pd.DataFrame,
     target_funding_ratio: float,
@@ -843,7 +859,17 @@ def _build_actus_assets_and_cashflows(
     from pk_alm.actus_asset_engine.aal_engine import run_aal_asset_engine
     from pk_alm.scenarios.stage1_baseline import _asset_snapshots_from_actus_trajectory
 
-    asset_result = run_aal_asset_engine(asset_specs)
+    start_year = int(pd.to_datetime(liability_cashflows["time"]).dt.year.min())
+    asset_result = run_aal_asset_engine(
+        contracts=asset_contracts,
+        settings=AALSimulationSettings(
+            analysis_date=f"{start_year}-01-01T00:00:00",
+            event_start_date=f"{start_year}-01-01T00:00:00",
+            event_end_date=f"{start_year + horizon_years}-12-31T00:00:00",
+            mode="validated",
+            cashflow_cutoff_mode="from_status_date",
+        ),
+    )
     target_assets = float(valuation_for_funding.iloc[0]["total_stage1_liability"]) * target_funding_ratio
     zero_cash = compute_actus_asset_trajectory(
         asset_result.contracts,
@@ -858,9 +884,8 @@ def _build_actus_assets_and_cashflows(
         horizon_years,
         initial_cash=initial_cash,
     )
-    start_year = int(pd.to_datetime(liability_cashflows["time"]).dt.year.min())
     assumption_cashflows = _build_assumption_income_cashflows(
-        asset_specs, horizon_years=horizon_years, start_year=start_year
+        asset_contracts, horizon_years=horizon_years, start_year=start_year
     )
     frames = [liability_cashflows, asset_result.cashflows]
     if not assumption_cashflows.empty:
@@ -879,7 +904,7 @@ def _build_actus_assets_and_cashflows(
 
 
 def _build_assumption_income_cashflows(
-    asset_specs: tuple[AssetSpec, ...],
+    asset_contracts: tuple[AALContractConfig, ...],
     *,
     horizon_years: int,
     start_year: int,
@@ -889,51 +914,61 @@ def _build_assumption_income_cashflows(
 
     Public AAL/ACTUS server does not emit STK dividends or CSH temporal events.
     To make the income side of the cockpit realistic without changing the AAL
-    engine, we synthesize annual income as `nominal * yield` for each STKSpec
+    engine, we synthesize annual income as `nominal * yield` for each STK
     with positive `dividend_yield`. Reported with source="MANUAL" so analysts
     can distinguish ACTUS-engine output from assumption-based income.
 
     When ``include_pam_coupons`` is True (deterministic-proxy mode only — must
     not be enabled when the live AAL engine runs, to avoid double-counting),
-    each PAMSpec also emits annual coupons until maturity.
+    each PAM config also emits annual coupons until maturity.
     """
     records: list[dict[str, object]] = []
-    for spec in asset_specs:
-        if isinstance(spec, STKSpec):
-            annual_yield = float(getattr(spec, "dividend_yield", 0.0))
+    for contract in asset_contracts:
+        terms = contract.terms
+        if contract.contract_type == "STK":
+            nominal = float(terms.get("notionalPrincipal", 0.0))
+            dividend = float(terms.get("nextDividendPaymentAmount", 0.0))
+            annual_yield = 0.0 if nominal <= 0.0 else dividend / nominal
             if annual_yield <= 0.0:
                 continue
-            nominal = float(spec.quantity) * float(spec.price_at_purchase)
             if nominal <= 0.0:
                 continue
-            last_income_year = min(int(spec.divestment_year) - 1, start_year + horizon_years)
-            for year in range(int(spec.start_year), last_income_year + 1):
+            termination = pd.Timestamp(terms.get("terminationDate"))
+            status = pd.Timestamp(terms.get("statusDate"))
+            last_income_year = min(
+                int(termination.year) - 1, start_year + horizon_years
+            )
+            for year in range(int(status.year), last_income_year + 1):
                 records.append(
                     {
-                        "contractId": str(spec.contract_id),
+                        "contractId": contract.contract_id,
                         "time": pd.Timestamp(f"{year}-12-31"),
                         "type": "IP",
                         "payoff": nominal * annual_yield,
                         "nominalValue": nominal,
-                        "currency": str(spec.currency),
+                        "currency": contract.currency,
                         "source": "MANUAL",
                     }
                 )
-        elif include_pam_coupons and isinstance(spec, PAMSpec):
-            coupon_rate = float(getattr(spec, "coupon_rate", 0.0))
-            nominal = float(spec.nominal_value)
+        elif include_pam_coupons and contract.contract_type == "PAM":
+            coupon_rate = float(terms.get("nominalInterestRate", 0.0))
+            nominal = float(terms.get("notionalPrincipal", 0.0))
             if coupon_rate <= 0.0 or nominal <= 0.0:
                 continue
-            last_coupon_year = min(int(spec.maturity_year) - 1, start_year + horizon_years)
-            for year in range(int(spec.start_year), last_coupon_year + 1):
+            maturity = pd.Timestamp(terms.get("maturityDate"))
+            status = pd.Timestamp(terms.get("statusDate"))
+            last_coupon_year = min(
+                int(maturity.year) - 1, start_year + horizon_years
+            )
+            for year in range(int(status.year), last_coupon_year + 1):
                 records.append(
                     {
-                        "contractId": str(spec.contract_id),
+                        "contractId": contract.contract_id,
                         "time": pd.Timestamp(f"{year}-12-31"),
                         "type": "IP",
                         "payoff": nominal * coupon_rate,
                         "nominalValue": nominal,
-                        "currency": str(spec.currency),
+                        "currency": contract.currency,
                         "source": "MANUAL",
                     }
                 )
@@ -1285,27 +1320,24 @@ def _allocation_weights(df: pd.DataFrame) -> dict[str, float]:
     return weights
 
 
-def _stk_spec(
+def _stk_contract_config(
     asset_class: str,
     start_year: int,
     nominal: float,
     dividend_yield: float,
     growth: float,
     horizon_years: int = 12,
-) -> STKSpec:
-    price = 100.0
-    quantity = nominal / price
+) -> AALContractConfig:
     years = max(1, int(horizon_years))
-    return STKSpec(
+    return make_stk_contract_config_from_nominal(
         contract_id=f"COCKPIT_{asset_class.upper()}",
         start_year=start_year,
         divestment_year=start_year + years,
-        quantity=quantity,
-        price_at_purchase=price,
-        price_at_termination=price * ((1.0 + growth) ** years),
-        currency="CHF",
+        nominal_value=nominal,
         dividend_yield=dividend_yield,
         market_value_growth=growth,
+        price_at_purchase=100.0,
+        currency="CHF",
     )
 
 

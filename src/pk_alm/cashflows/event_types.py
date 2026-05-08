@@ -8,6 +8,7 @@ Liability-side BVG events:
 - ``IN``: entry transfer-in capital (non-negative payoff).
 
 Asset-side ACTUS events:
+- ``IED``: initial exchange / purchase cashflow (any sign).
 - ``IP``: interest payment (any sign).
 - ``MD``: maturity redemption (any sign).
 - ``TD``: termination / divestment (any sign).
@@ -25,6 +26,7 @@ EX: Final[str] = "EX"
 IN: Final[str] = "IN"
 
 IP: Final[str] = "IP"
+IED: Final[str] = "IED"
 MD: Final[str] = "MD"
 TD: Final[str] = "TD"
 
@@ -38,6 +40,7 @@ BVG_EVENT_TYPES: Final[dict[str, str]] = {
 }
 
 ACTUS_EVENT_TYPES: Final[dict[str, str]] = {
+    IED: "Initial exchange / purchase cashflow",
     IP: "Interest payment",
     MD: "Maturity redemption",
     TD: "Termination / divestment",
@@ -51,6 +54,7 @@ EXPECTED_PAYOFF_SIGNS: Final[dict[str, SignRule]] = {
     KA: "non_positive",
     EX: "non_positive",
     IN: "non_negative",
+    IED: "any",
     IP: "any",
     MD: "any",
     TD: "any",

@@ -13,7 +13,7 @@ from typing import Literal
 
 import pandas as pd
 
-from pk_alm.actus_asset_engine.aal_asset_portfolio import AssetSpec
+from pk_alm.actus_asset_engine.contract_config import AALContractConfig
 from pk_alm.alm_analytics_engine.cashflows import (
     find_liquidity_inflection_year,
     summarize_cashflows_by_year,
@@ -205,7 +205,7 @@ def run_stage2c_dynamic_parameters(
     entry_assumptions: EntryAssumptions | None = None,
     conversion_rate: DynamicLike = 0.068,
     asset_mode: AssetMode = ASSET_MODE_DETERMINISTIC,
-    asset_specs: tuple[AssetSpec, ...] | list[AssetSpec] | None = None,
+    asset_contracts: tuple[AALContractConfig, ...] | list[AALContractConfig] | None = None,
     output_dir: str | Path | None = "outputs/stage2c_dynamic_parameters",
 ) -> Stage2CResult:
     """Run the Stage-2C dynamic-parameter scenario end to end."""
@@ -289,7 +289,7 @@ def run_stage2c_dynamic_parameters(
         ) = _build_actus_mode_outputs(
             valuation_snapshots=valuation_snapshots,
             liability_cashflows=engine_result.cashflows,
-            asset_specs=asset_specs,
+            asset_contracts=asset_contracts,
             target_funding_ratio=target_funding_ratio,
             start_year=start_year,
             horizon_years=horizon_years,

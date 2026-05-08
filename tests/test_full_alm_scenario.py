@@ -7,8 +7,10 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from pk_alm.actus_asset_engine.aal_asset_portfolio import PAMSpec
+from pk_alm.actus_asset_engine.aal_asset_portfolio import make_pam_contract_config
 from pk_alm.actus_asset_engine.aal_engine import AALAssetEngineResult
+from pk_alm.actus_asset_engine.risk_factors import AALRiskFactorSet
+from pk_alm.actus_asset_engine.simulation_settings import AALSimulationSettings
 from pk_alm.cashflows.schema import CASHFLOW_COLUMNS, validate_cashflow_dataframe
 from pk_alm.scenarios import full_alm_scenario as scenario_mod
 from pk_alm.scenarios.full_alm_scenario import (
@@ -26,7 +28,13 @@ _PYPROJECT = _REPO_ROOT / "pyproject.toml"
 
 
 def _fake_asset_result() -> AALAssetEngineResult:
-    spec = PAMSpec("TEST_PAM", 2026, 2028, 100_000.0, 0.02)
+    contract = make_pam_contract_config(
+        contract_id="TEST_PAM",
+        start_year=2026,
+        maturity_year=2028,
+        nominal_value=100_000.0,
+        coupon_rate=0.02,
+    )
     cashflows = pd.DataFrame(
         [
             {
@@ -52,7 +60,17 @@ def _fake_asset_result() -> AALAssetEngineResult:
     )
     return AALAssetEngineResult(
         cashflows=cashflows,
-        contracts=(spec,),
+        contracts=(contract,),
+        risk_factors=AALRiskFactorSet(),
+        settings=AALSimulationSettings(
+            analysis_date="2026-01-01T00:00:00",
+            event_start_date="2026-01-01T00:00:00",
+            event_end_date="2038-12-31T00:00:00",
+        ),
+        event_summary=pd.DataFrame(),
+        event_coverage_report=pd.DataFrame(),
+        risk_factor_report=pd.DataFrame(),
+        limitation_report=pd.DataFrame(),
         aal_version="fake",
         notes=("fake AAL result",),
     )
@@ -62,8 +80,8 @@ def _fake_asset_result() -> AALAssetEngineResult:
 def fake_aal_engine(monkeypatch):
     calls = []
 
-    def fake_run_aal_asset_engine(*, specs=None):
-        calls.append(specs)
+    def fake_run_aal_asset_engine(*, contracts=None, risk_factors=None, settings=None):
+        calls.append(contracts)
         return _fake_asset_result()
 
     monkeypatch.setattr(
@@ -90,10 +108,18 @@ def test_full_alm_scenario_runs_with_required_aal_path(fake_aal_engine):
     assert result.aal_asset_result.generation_mode == "aal"
 
 
-def test_asset_specs_are_passed_to_aal_engine(fake_aal_engine):
-    specs = (PAMSpec("CUSTOM", 2026, 2028, 100_000.0, 0.02),)
-    run_full_alm_scenario(asset_specs=specs)
-    assert fake_aal_engine == [specs]
+def test_asset_contracts_are_passed_to_aal_engine(fake_aal_engine):
+    contracts = (
+        make_pam_contract_config(
+            contract_id="CUSTOM",
+            start_year=2026,
+            maturity_year=2028,
+            nominal_value=100_000.0,
+            coupon_rate=0.02,
+        ),
+    )
+    run_full_alm_scenario(asset_contracts=contracts)
+    assert fake_aal_engine == [contracts]
 
 
 def test_combined_row_count_equals_bvg_plus_asset_rows(fake_aal_engine):

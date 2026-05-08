@@ -4,9 +4,15 @@ from pathlib import Path
 
 import pandas as pd
 
-from pk_alm.actus_asset_engine.aal_asset_portfolio import CSHSpec, PAMSpec, STKSpec
+from pk_alm.actus_asset_engine.aal_asset_portfolio import (
+    make_csh_contract_config,
+    make_pam_contract_config,
+    make_stk_contract_config_from_nominal,
+)
 from pk_alm.actus_asset_engine.aal_engine import AALAssetEngineResult
 from pk_alm.actus_asset_engine.actus_trajectory import ACTUS_ASSET_TRAJECTORY_COLUMNS
+from pk_alm.actus_asset_engine.risk_factors import AALRiskFactorSet
+from pk_alm.actus_asset_engine.simulation_settings import AALSimulationSettings
 from pk_alm.cashflows.schema import CASHFLOW_COLUMNS
 from pk_alm.bvg_liability_engine.actuarial_assumptions.mortality import MORTALITY_MODE_EK0105, MORTALITY_MODE_OFF
 from pk_alm.scenarios import stage1_baseline as stage1_mod
@@ -21,20 +27,28 @@ from pk_alm.scenarios.stage2b_mortality import (
 )
 
 
-def _fake_specs():
+def _fake_contracts():
     return (
-        PAMSpec("FAKE_PAM", 2026, 2028, 100_000.0, 0.02),
-        STKSpec(
-            "FAKE_STK",
-            2026,
-            2028,
-            quantity=1_000.0,
-            price_at_purchase=100.0,
-            price_at_termination=110.0,
+        make_pam_contract_config(
+            contract_id="FAKE_PAM",
+            start_year=2026,
+            maturity_year=2028,
+            nominal_value=100_000.0,
+            coupon_rate=0.02,
+        ),
+        make_stk_contract_config_from_nominal(
+            contract_id="FAKE_STK",
+            start_year=2026,
+            divestment_year=2028,
+            nominal_value=100_000.0,
             dividend_yield=0.02,
             market_value_growth=0.05,
         ),
-        CSHSpec("FAKE_CSH", 2026, 50_000.0),
+        make_csh_contract_config(
+            contract_id="FAKE_CSH",
+            start_year=2026,
+            nominal_value=50_000.0,
+        ),
     )
 
 
@@ -74,10 +88,20 @@ def _fake_asset_cashflows():
 
 
 def _patch_fake_asset_engine(monkeypatch) -> None:
-    def fake_run_aal_asset_engine(asset_specs=None):
+    def fake_run_aal_asset_engine(*, contracts=None, risk_factors=None, settings=None):
         return AALAssetEngineResult(
             cashflows=_fake_asset_cashflows(),
-            contracts=_fake_specs(),
+            contracts=_fake_contracts(),
+            risk_factors=AALRiskFactorSet(),
+            settings=AALSimulationSettings(
+                analysis_date="2026-01-01T00:00:00",
+                event_start_date="2026-01-01T00:00:00",
+                event_end_date="2038-12-31T00:00:00",
+            ),
+            event_summary=pd.DataFrame(),
+            event_coverage_report=pd.DataFrame(),
+            risk_factor_report=pd.DataFrame(),
+            limitation_report=pd.DataFrame(),
             aal_version="fake",
             notes=("fake phase2 asset engine",),
         )
