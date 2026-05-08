@@ -1,2 +1,0 @@
-mortality_mode,mortality_table_id,mortality_table_max_age,source,source_caveat,real_valuation_note
-ek0105,EKF 0105,127,EK 0105 educational table,"EK 0105 is a simplified educational mortality input. BVG 2020 / VZ 2020 would be more appropriate for real Swiss pension-fund valuation, but are out of scope for this prototype.",BVG 2020 / VZ 2020 would be more appropriate for real Swiss pension-fund valuation.

@@ -1,1 +1,0 @@
-Pre-refactor pytest baseline: 992 passed, 7 failed (all in test_documentation_status.py - pre-existing missing docs/implementation_progress.md), 2 skipped.
