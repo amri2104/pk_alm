@@ -14,9 +14,9 @@ from pathlib import Path
 import pandas as pd
 
 from pk_alm.alm_analytics_engine.alm_kpis import build_alm_kpi_summary
+from pk_alm.alm_analytics_engine.analytics_result import ALMAnalyticsResult
 from pk_alm.bvg_liability_engine.pension_logic.valuation import validate_valuation_dataframe
 from pk_alm.reporting.full_alm_export import reject_protected_stage1_output_dir
-from pk_alm.scenarios.full_alm_scenario import FullALMScenarioResult
 
 BENCHMARK_PLAUSIBILITY_COLUMNS = (
     "metric",
@@ -55,11 +55,22 @@ def _coerce_optional_float(value: object, name: str) -> float | None:
     return fval
 
 
+def _coerce_analytics_result(value: object) -> ALMAnalyticsResult:
+    if isinstance(value, ALMAnalyticsResult):
+        return value
+    nested = getattr(value, "alm_analytics_result", None)
+    if isinstance(nested, ALMAnalyticsResult):
+        return nested
+    raise TypeError(
+        "result must be ALMAnalyticsResult or expose an alm_analytics_result"
+    )
+
+
 def _derive_model_values(
-    scenario_result: FullALMScenarioResult,
+    result: ALMAnalyticsResult,
 ) -> dict[str, float]:
-    summary = build_alm_kpi_summary(scenario_result)
-    valuation_snapshots = scenario_result.stage1_result.valuation_snapshots
+    summary = build_alm_kpi_summary(result)
+    valuation_snapshots = result.inputs.valuation_snapshots
     validate_valuation_dataframe(valuation_snapshots)
     if valuation_snapshots.empty:
         raise ValueError("valuation_snapshots must not be empty")
@@ -77,7 +88,7 @@ def _default_unit(metric: str) -> str:
 
 
 def build_benchmark_plausibility_table(
-    scenario_result: FullALMScenarioResult,
+    result: object,
     *,
     reference_values: Mapping[str, float] | None = None,
     model_values: Mapping[str, float | None] | None = None,
@@ -90,11 +101,7 @@ def build_benchmark_plausibility_table(
     model values, such as conversion rates or asset-allocation shares, must be
     supplied explicitly by the caller.
     """
-    if not isinstance(scenario_result, FullALMScenarioResult):
-        raise TypeError(
-            "scenario_result must be FullALMScenarioResult, got "
-            f"{type(scenario_result).__name__}"
-        )
+    analytics_result = _coerce_analytics_result(result)
 
     refs = _validate_mapping(reference_values, "reference_values")
     extras = _validate_mapping(model_values, "model_values")
@@ -102,7 +109,7 @@ def build_benchmark_plausibility_table(
     note_map = _validate_mapping(notes, "notes")
 
     derived_model_values: dict[str, float | None] = _derive_model_values(
-        scenario_result
+        analytics_result
     )
     for metric, value in extras.items():
         derived_model_values[metric] = _coerce_optional_float(
@@ -151,7 +158,7 @@ def build_benchmark_plausibility_table(
 
 
 def export_benchmark_plausibility(
-    scenario_result: FullALMScenarioResult,
+    result: object,
     output_dir: str | Path,
     *,
     reference_values: Mapping[str, float] | None = None,
@@ -164,7 +171,7 @@ def export_benchmark_plausibility(
     out_path.mkdir(parents=True, exist_ok=True)
 
     table = build_benchmark_plausibility_table(
-        scenario_result,
+        result,
         reference_values=reference_values,
         model_values=model_values,
         units=units,

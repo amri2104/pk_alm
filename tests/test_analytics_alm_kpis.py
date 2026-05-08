@@ -21,7 +21,7 @@ from pk_alm.scenarios.full_alm_scenario import run_full_alm_scenario
 
 @lru_cache(maxsize=1)
 def _scenario():
-    return run_full_alm_scenario()
+    return run_full_alm_scenario().alm_analytics_result
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ def test_kpi_first_and_final_years_match_annual_cashflows():
 def test_funding_kpis_match_stage1_funding_summary():
     scenario = _scenario()
     summary = build_alm_kpi_summary(scenario)
-    fs = scenario.stage1_result.funding_summary.iloc[0]
+    fs = scenario.funding_summary.iloc[0]
     assert summary.initial_funding_ratio_percent == pytest.approx(
         float(fs["initial_funding_ratio_percent"])
     )

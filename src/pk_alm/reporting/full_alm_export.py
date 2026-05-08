@@ -20,11 +20,9 @@ import pandas as pd
 
 from pk_alm.alm_analytics_engine.alm_kpis import (
     ALMKPISummary,
-    alm_kpi_summary_to_dataframe,
     build_alm_kpi_summary,
-    build_cashflow_by_source_plot_table,
-    build_net_cashflow_plot_table,
 )
+from pk_alm.alm_analytics_engine.analytics_result import ALMAnalyticsResult
 from pk_alm.alm_analytics_engine.cashflows import validate_annual_cashflow_dataframe
 from pk_alm.alm_analytics_engine.funding import validate_funding_ratio_dataframe
 from pk_alm.cashflows.schema import validate_cashflow_dataframe
@@ -50,6 +48,7 @@ class FullALMExportResult:
     output_dir: Path
     output_paths: dict[str, Path]
     scenario_result: FullALMScenarioResult
+    analytics_result: ALMAnalyticsResult
     kpi_summary: ALMKPISummary
     kpi_summary_df: pd.DataFrame
     cashflow_by_source: pd.DataFrame
@@ -83,6 +82,11 @@ class FullALMExportResult:
             raise TypeError(
                 "scenario_result must be FullALMScenarioResult, got "
                 f"{type(self.scenario_result).__name__}"
+            )
+        if not isinstance(self.analytics_result, ALMAnalyticsResult):
+            raise TypeError(
+                "analytics_result must be ALMAnalyticsResult, got "
+                f"{type(self.analytics_result).__name__}"
             )
         if not isinstance(self.kpi_summary, ALMKPISummary):
             raise TypeError(
@@ -166,24 +170,23 @@ def export_full_alm_result(
     out_path = reject_protected_stage1_output_dir(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
-    kpi_summary = build_alm_kpi_summary(result)
-    kpi_summary_df = alm_kpi_summary_to_dataframe(kpi_summary)
-    cashflow_by_source = build_cashflow_by_source_plot_table(
-        result.combined_cashflows
-    )
-    net_cashflow = build_net_cashflow_plot_table(result.annual_cashflows)
+    analytics_result = result.alm_analytics_result
+    kpi_summary = build_alm_kpi_summary(analytics_result)
+    kpi_summary_df = analytics_result.kpi_summary.copy(deep=True)
+    cashflow_by_source = analytics_result.cashflow_by_source_plot_table.copy(deep=True)
+    net_cashflow = analytics_result.net_cashflow_plot_table.copy(deep=True)
 
-    validate_annual_cashflow_dataframe(result.annual_cashflows)
-    validate_cashflow_dataframe(result.combined_cashflows)
-    validate_funding_ratio_dataframe(result.stage1_result.funding_ratio_trajectory)
+    validate_annual_cashflow_dataframe(analytics_result.annual_cashflows)
+    validate_cashflow_dataframe(analytics_result.combined_cashflows)
+    validate_funding_ratio_dataframe(analytics_result.funding_ratio_trajectory)
 
     dataframes = {
         "kpi_summary": kpi_summary_df,
-        "annual_cashflows": result.annual_cashflows,
+        "annual_cashflows": analytics_result.annual_cashflows,
         "cashflow_by_source": cashflow_by_source,
         "net_cashflow": net_cashflow,
-        "combined_cashflows": result.combined_cashflows,
-        "funding_ratio_trajectory": result.stage1_result.funding_ratio_trajectory,
+        "combined_cashflows": analytics_result.combined_cashflows,
+        "funding_ratio_trajectory": analytics_result.funding_ratio_trajectory,
     }
 
     output_paths = {
@@ -197,6 +200,7 @@ def export_full_alm_result(
         output_dir=out_path,
         output_paths=output_paths,
         scenario_result=result,
+        analytics_result=analytics_result,
         kpi_summary=kpi_summary,
         kpi_summary_df=kpi_summary_df,
         cashflow_by_source=cashflow_by_source,

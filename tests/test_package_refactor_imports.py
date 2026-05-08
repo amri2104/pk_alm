@@ -18,9 +18,19 @@ def test_new_actus_asset_engine_import_paths():
 
 
 def test_new_alm_analytics_engine_import_paths():
-    from pk_alm.alm_analytics_engine import funding
+    from pk_alm.alm_analytics_engine import (
+        ALMAnalyticsInput,
+        ALMAnalyticsResult,
+        compare_alm_analytics_results,
+        funding,
+        run_alm_analytics,
+    )
     from pk_alm.alm_analytics_engine.cashflows import summarize_cashflows_by_year
 
+    assert ALMAnalyticsInput.__name__ == "ALMAnalyticsInput"
+    assert ALMAnalyticsResult.__name__ == "ALMAnalyticsResult"
+    assert callable(compare_alm_analytics_results)
+    assert callable(run_alm_analytics)
     assert hasattr(funding, "build_funding_ratio_trajectory")
     assert callable(summarize_cashflows_by_year)
 

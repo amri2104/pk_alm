@@ -1,14 +1,14 @@
 """Compact ALM KPI / plot-ready output layer.
 
-This layer reads existing Full ALM scenario outputs and produces:
+This layer reads canonical ALM Analytics Engine outputs and produces:
 
 - An :class:`ALMKPISummary` dataclass with a small set of stable KPIs.
 - Plot-ready DataFrames for cashflow-by-source and net-cashflow visualization.
 
 It does not introduce new actuarial assumptions, new market assumptions, or
 new funding-ratio logic. Funding-ratio KPIs are read straight from the
-Stage-1 funding summary; cashflow KPIs are derived from the existing
-combined and annual cashflow DataFrames.
+funding summary; cashflow KPIs are derived from the existing combined and
+annual cashflow DataFrames.
 """
 
 from __future__ import annotations
@@ -23,8 +23,10 @@ from pk_alm.alm_analytics_engine.cashflows import (
     find_liquidity_inflection_year,
     validate_annual_cashflow_dataframe,
 )
+from pk_alm.alm_analytics_engine.funding_summary import (
+    validate_funding_summary_dataframe,
+)
 from pk_alm.cashflows.schema import validate_cashflow_dataframe
-from pk_alm.scenarios.full_alm_scenario import FullALMScenarioResult
 
 ALM_KPI_SUMMARY_COLUMNS = (
     "initial_funding_ratio_percent",
@@ -169,43 +171,30 @@ def _sum_payoff(df: pd.DataFrame) -> float:
     return float(df["payoff"].sum())
 
 
-def build_alm_kpi_summary(
-    scenario_result: FullALMScenarioResult,
+def build_alm_kpi_summary_from_tables(
+    *,
+    bvg_cashflows: pd.DataFrame,
+    asset_cashflows: pd.DataFrame,
+    combined_cashflows: pd.DataFrame,
+    annual_cashflows: pd.DataFrame,
+    funding_summary: pd.DataFrame,
 ) -> ALMKPISummary:
-    """Build an ALMKPISummary from a Full ALM scenario result.
-
-    Funding-ratio KPIs are read directly from the Stage-1 funding summary.
-    Cashflow totals are derived from the BVG, asset, and combined
-    DataFrames already validated by the scenario. The liquidity inflection
-    year is computed on the combined annual cashflows using the existing
-    structural-net rule.
-    """
-    if not isinstance(scenario_result, FullALMScenarioResult):
-        raise TypeError(
-            f"scenario_result must be FullALMScenarioResult, "
-            f"got {type(scenario_result).__name__}"
-        )
-
-    funding_summary = scenario_result.stage1_result.funding_summary
+    """Build an ALMKPISummary from canonical analytics tables."""
+    validate_cashflow_dataframe(bvg_cashflows)
+    validate_cashflow_dataframe(asset_cashflows)
+    validate_cashflow_dataframe(combined_cashflows)
+    validate_annual_cashflow_dataframe(annual_cashflows)
+    validate_funding_summary_dataframe(funding_summary)
     if funding_summary.empty:
         raise ValueError("funding_summary must not be empty")
-    fs = funding_summary.iloc[0]
-
-    annual = scenario_result.annual_cashflows
-    if annual.empty:
+    if len(funding_summary) != 1:
+        raise ValueError("funding_summary must contain exactly one row")
+    if annual_cashflows.empty:
         raise ValueError("annual_cashflows must not be empty")
 
-    years = [int(y) for y in annual["reporting_year"]]
-    first_year = min(years)
-    final_year = max(years)
-
-    inflection = find_liquidity_inflection_year(annual, use_structural=True)
-
-    total_bvg = _sum_payoff(scenario_result.bvg_cashflows)
-    total_actus = _sum_payoff(scenario_result.asset_cashflows)
-    total_combined = total_bvg + total_actus
-
-    currencies = set(annual["currency"].unique().tolist())
+    fs = funding_summary.iloc[0]
+    years = [int(y) for y in annual_cashflows["reporting_year"]]
+    currencies = set(annual_cashflows["currency"].unique().tolist())
     currency = currencies.pop() if len(currencies) == 1 else "CHF"
 
     return ALMKPISummary(
@@ -213,13 +202,34 @@ def build_alm_kpi_summary(
         final_funding_ratio_percent=float(fs["final_funding_ratio_percent"]),
         minimum_funding_ratio_percent=float(fs["minimum_funding_ratio_percent"]),
         years_below_100_percent=int(fs["years_below_100_percent"]),
-        total_bvg_cashflow=total_bvg,
-        total_actus_cashflow=total_actus,
-        total_combined_cashflow=total_combined,
-        first_year=first_year,
-        final_year=final_year,
-        liquidity_inflection_year=inflection,
+        total_bvg_cashflow=_sum_payoff(bvg_cashflows),
+        total_actus_cashflow=_sum_payoff(asset_cashflows),
+        total_combined_cashflow=_sum_payoff(combined_cashflows),
+        first_year=min(years),
+        final_year=max(years),
+        liquidity_inflection_year=find_liquidity_inflection_year(
+            annual_cashflows,
+            use_structural=True,
+        ),
         currency=currency,
+    )
+
+
+def build_alm_kpi_summary(analytics_result: object) -> ALMKPISummary:
+    """Build an ALMKPISummary from an ALMAnalyticsResult."""
+    from pk_alm.alm_analytics_engine.analytics_result import ALMAnalyticsResult
+
+    if not isinstance(analytics_result, ALMAnalyticsResult):
+        raise TypeError(
+            f"analytics_result must be ALMAnalyticsResult, "
+            f"got {type(analytics_result).__name__}"
+        )
+    return build_alm_kpi_summary_from_tables(
+        bvg_cashflows=analytics_result.inputs.bvg_cashflows,
+        asset_cashflows=analytics_result.inputs.asset_cashflows,
+        combined_cashflows=analytics_result.combined_cashflows,
+        annual_cashflows=analytics_result.annual_cashflows,
+        funding_summary=analytics_result.funding_summary,
     )
 
 
@@ -233,6 +243,39 @@ def alm_kpi_summary_to_dataframe(summary: ALMKPISummary) -> pd.DataFrame:
         [summary.to_dict()],
         columns=list(ALM_KPI_SUMMARY_COLUMNS),
     )
+
+
+def validate_alm_kpi_summary_dataframe(df: pd.DataFrame) -> bool:
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("df must be a pandas DataFrame")
+    missing = [col for col in ALM_KPI_SUMMARY_COLUMNS if col not in df.columns]
+    if missing:
+        raise ValueError(f"missing required columns: {missing}")
+    if list(df.columns) != list(ALM_KPI_SUMMARY_COLUMNS):
+        raise ValueError(
+            f"columns must be in order {list(ALM_KPI_SUMMARY_COLUMNS)}"
+        )
+    if df.empty:
+        return True
+    for _, row in df.iterrows():
+        ALMKPISummary(
+            initial_funding_ratio_percent=row["initial_funding_ratio_percent"],
+            final_funding_ratio_percent=row["final_funding_ratio_percent"],
+            minimum_funding_ratio_percent=row["minimum_funding_ratio_percent"],
+            years_below_100_percent=int(row["years_below_100_percent"]),
+            total_bvg_cashflow=row["total_bvg_cashflow"],
+            total_actus_cashflow=row["total_actus_cashflow"],
+            total_combined_cashflow=row["total_combined_cashflow"],
+            first_year=int(row["first_year"]),
+            final_year=int(row["final_year"]),
+            liquidity_inflection_year=(
+                None
+                if pd.isna(row["liquidity_inflection_year"])
+                else int(row["liquidity_inflection_year"])
+            ),
+            currency=row["currency"],
+        )
+    return True
 
 
 # ---------------------------------------------------------------------------

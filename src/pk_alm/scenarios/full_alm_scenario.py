@@ -5,9 +5,9 @@ This scenario glues the two engines:
 - BVG Liability Engine via the canonical assumptions-driven engine.
 - AAL Asset Engine via :func:`run_aal_asset_engine`.
 
-It concatenates both cashflow streams in the canonical CashflowRecord schema
-and recomputes annual cashflow analytics on the combined view. The default
-asset path is the required live AAL strategic engine.
+It delegates all cross-engine aggregation to the canonical
+``run_alm_analytics`` orchestrator. The default asset path is the required
+live AAL strategic engine.
 
 The scenario does not modify ``run_stage1_baseline(...)`` or the seven
 default Stage-1 CSV outputs.
@@ -20,6 +20,8 @@ from dataclasses import dataclass
 import pandas as pd
 
 from pk_alm.actus_asset_engine.contract_config import AALContractConfig
+from pk_alm.alm_analytics_engine.analytics_input import ALMAnalyticsInput
+from pk_alm.alm_analytics_engine.analytics_result import ALMAnalyticsResult
 from pk_alm.alm_analytics_engine.cashflows import (
     find_liquidity_inflection_year,
     summarize_cashflows_by_year,
@@ -30,6 +32,7 @@ from pk_alm.alm_analytics_engine.funding_summary import (
     funding_summary_to_dataframe,
     summarize_funding_ratio,
 )
+from pk_alm.alm_analytics_engine.engine import run_alm_analytics
 from pk_alm.actus_asset_engine.aal_engine import (
     AALAssetEngineResult,
     run_aal_asset_engine,
@@ -54,19 +57,13 @@ from pk_alm.scenarios.stage1_baseline import (
     build_default_stage1_portfolio,
 )
 
-_COMBINED_SORT_COLUMNS = ("time", "source", "contractId", "type")
-
-
 @dataclass(frozen=True)
 class FullALMScenarioResult:
     """Result container for one Full ALM scenario run."""
 
     stage1_result: Stage1BaselineResult
     aal_asset_result: AALAssetEngineResult
-    bvg_cashflows: pd.DataFrame
-    asset_cashflows: pd.DataFrame
-    combined_cashflows: pd.DataFrame
-    annual_cashflows: pd.DataFrame
+    alm_analytics_result: ALMAnalyticsResult
     generation_mode: str = "aal"
 
     def __post_init__(self) -> None:
@@ -80,42 +77,49 @@ class FullALMScenarioResult:
                 f"aal_asset_result must be AALAssetEngineResult, "
                 f"got {type(self.aal_asset_result).__name__}"
             )
-
-        for fname in ("bvg_cashflows", "asset_cashflows", "combined_cashflows"):
-            value = getattr(self, fname)
-            if not isinstance(value, pd.DataFrame):
-                raise TypeError(
-                    f"{fname} must be a pandas DataFrame, "
-                    f"got {type(value).__name__}"
-                )
-            validate_cashflow_dataframe(value)
-
+        if not isinstance(self.alm_analytics_result, ALMAnalyticsResult):
+            raise TypeError(
+                "alm_analytics_result must be ALMAnalyticsResult, got "
+                f"{type(self.alm_analytics_result).__name__}"
+            )
         if not self.asset_cashflows.empty and not (
             self.asset_cashflows["source"] == "ACTUS"
         ).all():
             raise ValueError('asset_cashflows source values must all be "ACTUS"')
-
-        expected_rows = len(self.bvg_cashflows) + len(self.asset_cashflows)
-        if len(self.combined_cashflows) != expected_rows:
-            raise ValueError(
-                "combined_cashflows must have exactly "
-                "len(bvg_cashflows) + len(asset_cashflows) rows "
-                f"({len(self.combined_cashflows)} != {expected_rows})"
-            )
-
-        if not isinstance(self.annual_cashflows, pd.DataFrame):
-            raise TypeError(
-                f"annual_cashflows must be a pandas DataFrame, "
-                f"got {type(self.annual_cashflows).__name__}"
-            )
-        validate_annual_cashflow_dataframe(self.annual_cashflows)
-
         if self.generation_mode != "aal":
             raise ValueError('generation_mode is fixed to "aal"')
         if self.aal_asset_result.generation_mode != "aal":
             raise ValueError(
                 'aal_asset_result.generation_mode must be fixed to "aal"'
             )
+
+    @property
+    def bvg_cashflows(self) -> pd.DataFrame:
+        return self.alm_analytics_result.inputs.bvg_cashflows
+
+    @property
+    def asset_cashflows(self) -> pd.DataFrame:
+        return self.alm_analytics_result.inputs.asset_cashflows
+
+    @property
+    def combined_cashflows(self) -> pd.DataFrame:
+        return self.alm_analytics_result.combined_cashflows
+
+    @property
+    def annual_cashflows(self) -> pd.DataFrame:
+        return self.alm_analytics_result.annual_cashflows
+
+    @property
+    def funding_ratio_trajectory(self) -> pd.DataFrame:
+        return self.alm_analytics_result.funding_ratio_trajectory
+
+    @property
+    def funding_summary(self) -> pd.DataFrame:
+        return self.alm_analytics_result.funding_summary
+
+    @property
+    def kpi_summary(self) -> pd.DataFrame:
+        return self.alm_analytics_result.kpi_summary
 
 
 def run_full_alm_scenario(
@@ -233,24 +237,20 @@ def run_full_alm_scenario(
     bvg_cashflows = stage1_result.engine_result.cashflows
     asset_cashflows = aal_asset_result.cashflows
 
-    combined_cashflows = pd.concat(
-        [bvg_cashflows, asset_cashflows],
-        ignore_index=True,
+    alm_analytics_result = run_alm_analytics(
+        ALMAnalyticsInput(
+            bvg_cashflows=bvg_cashflows,
+            asset_cashflows=asset_cashflows,
+            asset_snapshots=asset_snapshots,
+            valuation_snapshots=valuation_snapshots,
+            scenario_name=scenario_id,
+            target_funding_ratio=target_funding_ratio,
+            currency="CHF",
+        )
     )
-    combined_cashflows = combined_cashflows.sort_values(
-        list(_COMBINED_SORT_COLUMNS),
-        ignore_index=True,
-    )
-    validate_cashflow_dataframe(combined_cashflows)
-
-    annual_cashflows = summarize_cashflows_by_year(combined_cashflows)
-    validate_annual_cashflow_dataframe(annual_cashflows)
 
     return FullALMScenarioResult(
         stage1_result=stage1_result,
         aal_asset_result=aal_asset_result,
-        bvg_cashflows=bvg_cashflows,
-        asset_cashflows=asset_cashflows,
-        combined_cashflows=combined_cashflows,
-        annual_cashflows=annual_cashflows,
+        alm_analytics_result=alm_analytics_result,
     )
